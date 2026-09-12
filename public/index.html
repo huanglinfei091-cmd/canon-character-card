@@ -130,6 +130,42 @@
             <label>第三者名称 <span class="optional">可选</span><input id="ntr-third-party" placeholder="留空时由身份视角自动确定"></label>
             <p class="hint">NTR 自动按 IF 路线生成：先建立原关系和人物动机，再经过诱因、动摇、越界选择、发现与后果；不会开场直接把角色写成已经背叛。</p>
           </div>
+          <div class="quick-values" aria-labelledby="quick-values-title">
+            <div class="quick-values-heading">
+              <div><b id="quick-values-title">开场数值快捷设置</b><small>可以直接输入，也可以一键跳档或拉满</small></div>
+              <button id="reset-values" class="button ghost small" type="button">恢复默认</button>
+            </div>
+            <div class="quick-value-list">
+              <div class="quick-value-row" data-value-key="affinity">
+                <label for="initial-affinity"><span>好感度</span><small>-100～100；留空时按身份自动设置</small></label>
+                <input id="initial-affinity" type="number" min="-100" max="100" step="1" placeholder="身份默认">
+                <button class="value-boost" data-action="add" data-amount="10" type="button">+10</button>
+                <button class="value-boost" data-action="next" type="button">下一档</button>
+                <button class="value-boost max" data-action="max" type="button">拉满</button>
+              </div>
+              <div class="quick-value-row" data-value-key="corruption">
+                <label for="initial-corruption"><span>堕落／调教值</span><small>0～100；露骨成人路线启用</small></label>
+                <input id="initial-corruption" type="number" min="0" max="100" step="1" value="0">
+                <button class="value-boost" data-action="add" data-amount="10" type="button">+10</button>
+                <button class="value-boost" data-action="next" type="button">下一档</button>
+                <button class="value-boost max" data-action="max" type="button">拉满</button>
+              </div>
+              <div class="quick-value-row" data-value-key="betrayal">
+                <label for="initial-betrayal"><span>背叛值</span><small>0～100；越高越接近决裂与反转</small></label>
+                <input id="initial-betrayal" type="number" min="0" max="100" step="1" value="0">
+                <button class="value-boost" data-action="add" data-amount="10" type="button">+10</button>
+                <button class="value-boost" data-action="next" type="button">下一档</button>
+                <button class="value-boost max" data-action="max" type="button">拉满</button>
+              </div>
+            </div>
+            <div class="quick-value-actions" aria-label="全部数值快捷操作">
+              <button class="button secondary" data-all-values="10" type="button">三项一键 +10</button>
+              <button class="button secondary" data-all-values="50" type="button">三项一键 +50</button>
+              <button class="button primary" data-all-values="max" type="button">三项一键拉满</button>
+              <button class="button conflict" data-value-preset="extreme-conflict" type="button">极端冲突 -100／100／100</button>
+            </div>
+            <p class="hint">快捷值会写进导出的 Word／JSON 和启动指令。拉满只跳过数值积累，不会伪造已完成的事件、替角色同意或覆盖原作人格。</p>
+          </div>
           <p class="hint">身份决定初始好感、第一章、角色立场、专属剧情与结局；身份补充可以把任何预设改成你自己的版本。</p>
         </section>
 

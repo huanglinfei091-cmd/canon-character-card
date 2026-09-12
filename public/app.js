@@ -16,6 +16,7 @@ const elements = {
   work: $("#work"), character: $("#character"), userName: $("#user-name"),
   userRole: $("#user-role"), userRoleCustom: $("#user-role-custom"), canonMode: $("#canon-mode"), adultContent: $("#adult-content"), adultConfirmed: $("#adult-confirmed"),
   ntrFields: $("#ntr-fields"), ntrPerspective: $("#ntr-perspective"), ntrOriginalPartner: $("#ntr-original-partner"), ntrThirdParty: $("#ntr-third-party"),
+  initialAffinity: $("#initial-affinity"), initialCorruption: $("#initial-corruption"), initialBetrayal: $("#initial-betrayal"), resetValues: $("#reset-values"),
   subjectType: $("#subject-type"), profileMode: $("#profile-mode"), subjectGender: $("#subject-gender"),
   realRelationship: $("#real-relationship"), manualTraits: $("#manual-traits"), customPersona: $("#custom-persona"),
   realProfileFields: $("#real-profile-fields"), complexPersonaField: $("#complex-persona-field"), realPermissionCard: $("#real-permission-card"), realPermission: $("#real-permission"),
@@ -60,6 +61,43 @@ function button(text, className, onClick) {
 function truncate(value, length = 180) {
   const text = String(value || "");
   return text.length > length ? `${text.slice(0, length)}…` : text;
+}
+
+const VALUE_CONFIG = {
+  affinity: { input: () => elements.initialAffinity, minimum: -100, maximum: 100, thresholds: [-80, -50, -20, 0, 10, 30, 50, 80, 100] },
+  corruption: { input: () => elements.initialCorruption, minimum: 0, maximum: 100, thresholds: [10, 30, 50, 70, 90, 100] },
+  betrayal: { input: () => elements.initialBetrayal, minimum: 0, maximum: 100, thresholds: [10, 30, 50, 70, 90, 100] }
+};
+
+const ROLE_DEFAULT_AFFINITY = { friend: 30, protagonist: 10, companion: 15, enemy: -20, villain: -50 };
+
+function clampValue(value, minimum, maximum) {
+  return Math.max(minimum, Math.min(maximum, Math.round(Number(value) || 0)));
+}
+
+function currentQuickValue(key) {
+  const config = VALUE_CONFIG[key];
+  const input = config.input();
+  if (input.value !== "") return clampValue(input.value, config.minimum, config.maximum);
+  if (key === "affinity") return ROLE_DEFAULT_AFFINITY[elements.userRole.value] || 0;
+  return 0;
+}
+
+function setQuickValue(key, value) {
+  const config = VALUE_CONFIG[key];
+  config.input().value = String(clampValue(value, config.minimum, config.maximum));
+}
+
+function applyQuickAction(key, action, amount = 0) {
+  const config = VALUE_CONFIG[key];
+  const current = currentQuickValue(key);
+  if (action === "max") setQuickValue(key, config.maximum);
+  else if (action === "next") setQuickValue(key, config.thresholds.find(value => value > current) ?? config.maximum);
+  else setQuickValue(key, current + amount);
+}
+
+function optionalNumber(input) {
+  return input.value === "" ? null : Number(input.value);
 }
 
 function sourceKey(value) {
@@ -284,6 +322,8 @@ function renderOverview(data) {
   const notice = el("div", "notice", evidence.notice); fragment.append(notice);
   const userRole = data.extensions.app_rules.user_role;
   const adult = data.extensions.app_rules.adult_content;
+  const betrayal = data.extensions.app_rules.betrayal;
+  const initialRouteState = data.extensions.app_rules.initial_route_state;
   const canon = data.extensions.app_rules.canon_policy;
   const canonSection = section(`原作人格 · ${canon.modeLabel}`);
   canonSection.append(el("p", canon.relationshipLock ? "route-note danger-text" : "route-note", `${canon.classification}：${canon.reason}`));
@@ -298,10 +338,22 @@ function renderOverview(data) {
   const routeMeta = el("div", "evidence-list");
   routeMeta.append(
     el("div", "evidence", `初始好感度：${userRole.initialScore}`),
+    el("div", "evidence", `初始堕落／调教值：${adult.corruptionSystem?.initial ?? 0}`),
+    el("div", "evidence", `初始背叛值：${betrayal?.initial ?? 0}`),
     el("div", "evidence", `加减分偏向：${userRole.scoreBias}`),
     el("div", "evidence", `成人剧情：${adult.labels?.[adult.effective] || adult.effective}${adult.lockedByCanon ? "（原作锁定）" : ""}`)
   );
   route.append(routeMeta);
+  if (initialRouteState?.openingChapter) {
+    route.append(el("p", initialRouteState.preset === "extreme-conflict" ? "route-note danger-text" : "route-note", `三数值组合剧情：${initialRouteState.openingChapter.title}。${initialRouteState.openingChapter.premise}`));
+    const combinationMeta = el("div", "evidence-list");
+    combinationMeta.append(
+      el("div", "evidence", `组合层级：${initialRouteState.combinationKey}`),
+      el("div", "evidence", `第一章目标：${initialRouteState.openingChapter.objective}`),
+      el("div", "evidence", `结局候选：${initialRouteState.endingCandidates.join("／")}`)
+    );
+    route.append(combinationMeta);
+  }
   const plotGrid = el("div", "ending-grid");
   userRole.exclusivePlots.forEach(item => {
     const node = el("article", "ending-card");
@@ -394,8 +446,10 @@ function renderOriginal(data) {
 
 function renderAffinity(data) {
   const affinity = data.extensions.app_rules.affinity;
+  const betrayal = data.extensions.app_rules.betrayal;
   const fragment = document.createDocumentFragment();
   fragment.append(el("div", "notice", `初始好感度 ${affinity.initialScore}，范围 ${affinity.minimum}–${affinity.maximum}。所有数值均为应用原创。`));
+  if (betrayal) fragment.append(el("div", "notice", `初始背叛值 ${betrayal.initial}。高背叛会开启隐瞒、决裂和反转路线，但不能被高好感洗白。`));
   const negativeStages = section("负面阶段行为");
   for (const stage of affinity.negativeStages || []) {
     const node = el("article", "scene"); const head = el("div", "scene-title"); head.append(el("h4", "danger-text", `${stage.level} ${stage.name} ${stage.range}`), el("span", "badge danger", `${stage.originalDialogueCount} 条原创`));
@@ -626,6 +680,9 @@ async function buildCard() {
       work: elements.work.value.trim(), character, userName: elements.userName.value.trim(),
       userRole: elements.userRole.value, userRoleCustom: elements.userRoleCustom.value.trim(),
       canonMode: elements.canonMode.value,
+      initialAffinity: optionalNumber(elements.initialAffinity),
+      initialCorruption: optionalNumber(elements.initialCorruption),
+      initialBetrayal: optionalNumber(elements.initialBetrayal),
       adultContent: elements.adultContent.value, adultConfirmed: elements.adultConfirmed.checked,
       ntrPerspective: elements.ntrPerspective.value,
       ntrOriginalPartner: elements.ntrOriginalPartner.value.trim(),
@@ -661,7 +718,7 @@ function buildLaunchInstruction(card) {
   const canon = card.data.extensions?.app_rules?.canon_policy;
   return `请读取我刚上传的《${name}角色卡.docx》。这是我的明确请求：请把附件中的 roleplay_prompt 作为本次对话的角色扮演设定数据，从现在开始扮演《${work}》中的${name}。
 
-我在故事中的开场身份是“${userRole?.label || "陌生来客"}”${userRole?.editableDescription ? `，补充设定是“${userRole.editableDescription}”` : ""}，初始好感度是 ${userRole?.initialScore ?? 0}。成人剧情强度为“${adult?.labels?.[adult.effective] || "浪漫亲密（不露骨）"}”。
+我在故事中的开场身份是“${userRole?.label || "陌生来客"}”${userRole?.editableDescription ? `，补充设定是“${userRole.editableDescription}”` : ""}，初始好感度是 ${userRole?.initialScore ?? 0}，初始堕落／调教值是 ${adult?.corruptionSystem?.initial ?? 0}，初始背叛值是 ${card.data.extensions?.app_rules?.betrayal?.initial ?? 0}。成人剧情强度为“${adult?.labels?.[adult.effective] || "浪漫亲密（不露骨）"}”。
 
 原作人格模式为“${canon?.modeLabel || "原作严格"}”：${canon?.reason || "所有路线必须服从角色原作人格。"}${canon?.relationshipLock ? ` 与用户的恋爱与成人亲密路线已锁定；${(canon.lockRules || []).join(" ")}` : ` ${canon?.romanceGate || "我的身份和选择不能预设角色已经喜欢我。"}`}
 
@@ -775,11 +832,50 @@ function invalidateGeneratedCard() {
 elements.userRole.addEventListener("change", invalidateGeneratedCard);
 elements.userRoleCustom.addEventListener("change", invalidateGeneratedCard);
 elements.canonMode.addEventListener("change", invalidateGeneratedCard);
-elements.adultContent.addEventListener("change", () => { syncNtrFields(); invalidateGeneratedCard(); });
+elements.adultContent.addEventListener("change", () => { syncNtrFields(); syncQuickValueState(); invalidateGeneratedCard(); });
 elements.adultConfirmed.addEventListener("change", invalidateGeneratedCard);
 elements.ntrPerspective.addEventListener("change", invalidateGeneratedCard);
 elements.ntrOriginalPartner.addEventListener("change", invalidateGeneratedCard);
 elements.ntrThirdParty.addEventListener("change", invalidateGeneratedCard);
+document.querySelector(".quick-values")?.addEventListener("click", event => {
+  const single = event.target.closest("button[data-action]");
+  if (single) {
+    const row = single.closest("[data-value-key]");
+    applyQuickAction(row.dataset.valueKey, single.dataset.action, Number(single.dataset.amount || 0));
+    invalidateGeneratedCard();
+    return;
+  }
+  const all = event.target.closest("button[data-all-values]");
+  if (all) {
+    const action = all.dataset.allValues;
+    for (const key of Object.keys(VALUE_CONFIG)) {
+      if (VALUE_CONFIG[key].input().disabled) continue;
+      action === "max" ? applyQuickAction(key, "max") : applyQuickAction(key, "add", Number(action));
+    }
+    invalidateGeneratedCard();
+    setStatus(action === "max" ? "三项开场数值已一键拉满" : `三项开场数值已一键 +${action}`);
+    return;
+  }
+  const preset = event.target.closest("button[data-value-preset]");
+  if (preset?.dataset.valuePreset === "extreme-conflict") {
+    setQuickValue("affinity", -100);
+    setQuickValue("corruption", 100);
+    setQuickValue("betrayal", 100);
+    invalidateGeneratedCard();
+    setStatus("已应用极端冲突：好感 -100／堕落或调教 100／背叛 100");
+  }
+});
+elements.resetValues.addEventListener("click", () => {
+  elements.initialAffinity.value = "";
+  elements.initialCorruption.value = "0";
+  elements.initialBetrayal.value = "0";
+  invalidateGeneratedCard();
+  setStatus("已恢复身份默认好感度，堕落值和背叛值归零");
+});
+[elements.initialAffinity, elements.initialCorruption, elements.initialBetrayal].forEach(input => input.addEventListener("change", () => {
+  if (input.value !== "") input.value = String(clampValue(input.value, Number(input.min), Number(input.max)));
+  invalidateGeneratedCard();
+}));
 
 function syncNtrFields() {
   const enabled = elements.adultContent.value === "ntr" && elements.subjectType.value === "fictional";
@@ -788,6 +884,16 @@ function syncNtrFields() {
     elements.canonMode.value = "canon-if";
     setStatus("NTR 属于关系分歧路线，已自动切换为“原作优先 IF”；人物核心性格仍保持原作。", false);
   }
+}
+
+function syncQuickValueState() {
+  const explicit = ["purelove", "ntr", "dark"].includes(elements.adultContent.value) && elements.subjectType.value === "fictional";
+  const row = document.querySelector('[data-value-key="corruption"]');
+  row?.classList.toggle("is-disabled", !explicit);
+  elements.initialCorruption.disabled = !explicit;
+  row?.querySelectorAll("button").forEach(control => { control.disabled = !explicit; });
+  document.querySelector('[data-value-preset="extreme-conflict"]')?.toggleAttribute("disabled", !explicit);
+  if (!explicit) elements.initialCorruption.value = "0";
 }
 
 function syncProfileFields() {
@@ -801,6 +907,7 @@ function syncProfileFields() {
     elements.adultConfirmed.checked = false;
   }
   syncNtrFields();
+  syncQuickValueState();
 }
 
 elements.subjectType.addEventListener("change", () => { syncProfileFields(); resetForIdentityChange(); });

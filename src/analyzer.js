@@ -26,6 +26,13 @@ function normalizedText(value) {
   return String(value || "").replace(/\\[rn]/g, " ").replace(/\r/g, "").replace(/[ \t\u00a0]+/g, " ").trim();
 }
 
+function boundedScore(value, fallback, minimum, maximum) {
+  if (value === null || value === undefined || value === "") return { value: fallback, customized: false };
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return { value: fallback, customized: false };
+  return { value: Math.max(minimum, Math.min(maximum, Math.round(parsed))), customized: true };
+}
+
 function splitSentences(text) {
   return normalizedText(text)
     .split(/(?<=[。！？!?；;])|\n+/u)
@@ -861,7 +868,7 @@ function buildNtrScenario({ perspective, originalPartner, thirdParty, userRole, 
   };
 }
 
-function buildAdultSettings(requestedLevel, adultConfirmed, subjectType = "fictional", canonPolicy = {}, ntrConfig = {}) {
+function buildAdultSettings(requestedLevel, adultConfirmed, subjectType = "fictional", canonPolicy = {}, ntrConfig = {}, initialCorruption = null) {
   const character = normalizedText(ntrConfig.character) || "角色";
   const allowed = new Set(["off", "romance", "purelove", "ntr", "dark", "explicit"]);
   const normalized = requestedLevel === "explicit" ? "purelove" : requestedLevel;
@@ -869,6 +876,7 @@ function buildAdultSettings(requestedLevel, adultConfirmed, subjectType = "ficti
   const confirmed = adultConfirmed === true;
   const isExplicit = ["purelove", "ntr", "dark"].includes(requested);
   const effective = canonPolicy.relationshipLock ? "off" : (isExplicit && (!confirmed || subjectType !== "fictional")) ? "romance" : requested;
+  const corruptionStart = boundedScore(initialCorruption, 0, 0, 100);
   const ntrScenario = effective === "ntr" ? buildNtrScenario(ntrConfig) : null;
   const routeContent = {
     off: { chapters: [], endings: [], cgs: [] },
@@ -914,7 +922,8 @@ function buildAdultSettings(requestedLevel, adultConfirmed, subjectType = "ficti
     eventCGs: (routeContent?.cgs || []).map((title, index) => ({ id: `ADULT-CG-${effective.toUpperCase()}-${index + 1}`, title, unlock: "对应成人章节完成且当前同意与安全旗标仍有效", type: "成人事件CG文本脚本" })),
     corruptionSystem: {
       name: "堕落值／调教值",
-      initial: 0,
+      initial: ["purelove", "ntr", "dark"].includes(effective) ? corruptionStart.value : 0,
+      initialCustomized: ["purelove", "ntr", "dark"].includes(effective) && corruptionStart.customized,
       minimum: 0,
       maximum: 100,
       meaning: "0–49 显示为堕落值，表示对禁忌与背德幻想的动摇；50–100 进入调教路线，表示对预先协商的权力扮演、服从与反转的探索深度。它不是好感度、道德评判或性同意。",
@@ -957,6 +966,144 @@ function buildAdultSettings(requestedLevel, adultConfirmed, subjectType = "ficti
       "现实人物模式不生成露骨成人内容，也不把规则推演出的内心独白声称为本人真实想法。",
       "关闭或浪漫模式下不得擅自升级尺度；纯爱、NTR 或预先协商的黑暗权力模式可细写双方自愿的身体亲密、感官与事后交流，但必须保持角色人格和剧情因果。"
     ]
+  };
+}
+
+function buildBetrayalSystem(initialBetrayal) {
+  const start = boundedScore(initialBetrayal, 0, 0, 100);
+  return {
+    name: "背叛值",
+    initial: start.value,
+    initialCustomized: start.customized,
+    minimum: 0,
+    maximum: 100,
+    meaning: "记录隐瞒、违约、三角关系越界和阵营倒戈造成的背叛强度。它独立于好感度与堕落值；高好感不会洗白背叛，高背叛也不代表性同意。",
+    stages: [
+      { range: "0至9", name: "未破裂", behavior: "尚无足以改变路线的背叛事实，怀疑仍可通过沟通解决。" },
+      { range: "10至29", name: "疑点", behavior: "角色开始核验说法、保留证据和减少无条件信任。" },
+      { range: "30至49", name: "秘密", behavior: "隐瞒与双重立场成为冲突核心，开启追查、试探和坦白窗口。" },
+      { range: "50至69", name: "越界", behavior: "重要承诺或关系边界已经被打破，开启发现、对质和代价剧情。" },
+      { range: "70至89", name: "决裂", behavior: "角色优先自保、反制或清算；修复必须付出长期且可验证的代价。" },
+      { range: "90至100", name: "终局", behavior: "解锁背叛终章、隐藏反转或不可修复结局，不能用刷好感直接覆盖。" }
+    ],
+    events: [
+      { event: "隐瞒轻微但相关的事实", change: 2 },
+      { event: "利用嫉妒试探或维持双重说法", change: 5 },
+      { event: "违反明确约定或秘密发展另一段关系", change: 10 },
+      { event: "在阵营冲突中出卖关键情报或同伴", change: 15 },
+      { event: "主动坦白且让所有当事人分别选择", change: -5 },
+      { event: "承担后果并持续完成修复事件", change: -10 }
+    ],
+    scoringRules: [
+      "背叛值每轮根据新发生的事实独立增减，并限制在 0 至 100。",
+      "同一秘密被重复提及不重复加分；只有新的隐瞒、越界、发现或修复事实才改变数值。",
+      "快捷设置的开场值表示故事开始前已有相应强度的历史，但不会自动伪造某个具体事件；第一章需用符合人设的回忆或线索补足原因。",
+      "高好感度、高堕落值和成人路线不能抵消背叛后果；当下明确同意仍需独立判断。"
+    ],
+    display: "发生相关事件时显示【背叛值 ±N（原因），当前阶段（累计点数）】；系统面板始终显示当前累计值。"
+  };
+}
+
+function buildInitialRouteState({ affinity, corruption, betrayal, character, customized = false }) {
+  const affinityStages = [
+    [-80, "Neg.4 清算", "将用户视为必须清除或彻底隔离的对象"],
+    [-50, "Neg.3 敌对", "公开敌对、隐藏底牌并寻找反制机会"],
+    [-20, "Neg.2 戒备", "只保留有限合作与可随时撤离的退路"],
+    [-1, "Neg.1 疏离", "维持礼貌距离并减少主动接触"],
+    [9, "Lv.0 观察", "尚未形成稳定信任，只根据实际行为判断"],
+    [29, "Lv.1 初识", "允许有限靠近，但仍保留重要秘密"],
+    [49, "Lv.2 熟悉", "愿意共同处理事务并分享部分判断"],
+    [79, "Lv.3 信任", "会表达真实担忧，也会更在意失约"],
+    [99, "Lv.4 羁绊", "把用户视为重要且不可轻易替代的人"],
+    [100, "Lv.5 结局门槛", "关系强度到达上限，但结局仍由事件旗标决定"]
+  ];
+  const corruptionStages = [
+    [9, "界外", "没有明显禁忌欲望"], [29, "好奇", "对禁忌主题产生谨慎好奇"], [49, "诱惑", "出现身体吸引与主动试探"],
+    [69, "调教·确认", "愿意讨论强势亲密与权力交换"], [89, "调教·深入", "强烈欲望会主动影响选择"], [100, "调教·终章", "身体欲望与禁忌冲动达到最高层级"]
+  ];
+  const betrayalStages = [
+    [9, "未破裂", "关系中没有决定性背叛"], [29, "疑点", "开始核验说法并保留证据"], [49, "秘密", "隐瞒和双重立场成为核心冲突"],
+    [69, "越界", "重要承诺或关系边界已经被打破"], [89, "决裂", "角色优先自保、反制或清算"], [100, "终局", "背叛后果到达不可忽略的最高层级"]
+  ];
+  const pick = (score, table) => {
+    const [maximum, name, behavior] = table.find(([limit]) => score <= limit) || table.at(-1);
+    return { score, maximum, name, behavior };
+  };
+  const a = pick(affinity, affinityStages);
+  const c = pick(corruption, corruptionStages);
+  const b = pick(betrayal, betrayalStages);
+  let title = "三线交汇";
+  let centralConflict = `${a.behavior}；${c.behavior}；${b.behavior}。`;
+  let endingCandidates = ["关系推进", "保持现状", "关系降级", "隐藏反转"];
+  if (betrayal >= 90 && affinity <= -50 && corruption >= 90) {
+    title = "欲望尽头的清算";
+    centralConflict = `${character}对用户的敌意与背叛创伤都已到达极限，却仍承受最高等级的身体欲望。角色会把接近视为风险、诱饵或最后一次夺回主动权，不会因欲望突然原谅或爱上用户。`;
+    endingCandidates = ["拒绝诱惑并完成清算", "带条件的危险停火", "明确同意后的强势关系博弈", "隐藏反转·借欲望设局"];
+  } else if (betrayal >= 90 && affinity >= 80 && corruption >= 90) {
+    title = "爱欲与背叛的废墟";
+    centralConflict = `${character}仍把用户视为不可替代的人，也存在强烈欲望，但最高等级的背叛事实让任何靠近都伴随愤怒、审问与失去信任的代价。`;
+    endingCandidates = ["承担代价后的艰难重建", "仍相爱但彻底分开", "明确同意的危险重逢", "隐藏反转·关系重新命名"];
+  } else if (betrayal >= 90 && corruption < 30) {
+    title = "没有余温的审判";
+    centralConflict = `${character}几乎不受亲密欲望影响，剧情集中在证据、对质、反制与背叛责任，不用身体吸引软化冲突。`;
+    endingCandidates = ["公开审判", "冷静清算", "交换证据后分道", "隐藏反转·真正的背叛者"];
+  } else if (betrayal < 10 && affinity >= 80 && corruption >= 90) {
+    title = "无裂痕的深水区";
+    centralConflict = `${character}对用户拥有高信任和强烈欲望，且没有背叛历史；剧情重点是共同选择亲密边界、权力关系和未来，而不是制造虚假的误会。`;
+    endingCandidates = ["稳定亲密关系", "双方约定的权力幻想", "保持非排他关系", "隐藏结局·完全坦白"];
+  } else if (betrayal < 10 && affinity <= -50 && corruption >= 70) {
+    title = "没有信任的吸引";
+    centralConflict = `${character}不信任甚至敌视用户，但身体吸引明显存在；角色会主动划分欲望与立场，可能拒绝、谈条件、利用吸引设局，或在明确同意后进入不等于和解的亲密支线。`;
+    endingCandidates = ["克制欲望继续敌对", "危险交易", "明确同意但不和解", "隐藏反转·反向利用"];
+  } else if (betrayal >= 50 && affinity >= 50) {
+    title = "信任裂开之后";
+    centralConflict = `${character}仍保留重要感情或认可，但已经发生严重越界；剧情必须在坦白、追查、修复和决裂之间选择，不能用高好感跳过代价。`;
+    endingCandidates = ["承担代价后修复", "保持感情但结束关系", "再次背叛后决裂", "隐藏结局·共同揭露真相"];
+  } else if (corruption >= 70 && betrayal >= 50) {
+    title = "诱惑与秘密的代价";
+    centralConflict = `${character}的欲望已经会影响行动，同时背叛进入越界阶段；每次靠近都会同步改变欲望、信任和被发现风险。`;
+    endingCandidates = ["主动坦白", "秘密继续扩大", "关系重构", "隐藏结局·权力反转"];
+  } else if (affinity >= 50 && betrayal < 30) {
+    title = "被验证的靠近";
+    centralConflict = `${character}愿意信任用户，背叛风险较低；剧情根据欲望层级决定走共同使命、浪漫靠近或成人边界协商。`;
+    endingCandidates = ["长期同伴", "关系确认", "保持边界", "隐藏结局·共同未来"];
+  }
+  return {
+    affinity,
+    corruption,
+    betrayal,
+    combinationKey: `A:${a.name}|C:${c.name}|B:${b.name}`,
+    preset: affinity === -100 && corruption === 100 && betrayal === 100 ? "extreme-conflict" : "custom",
+    openingMode: customized ? "三数值组合优先" : "身份模板优先",
+    overridesIdentityOpening: customized && (betrayal >= 10 || affinity < 0 || corruption >= 30),
+    memorySeed: betrayal >= 90
+      ? "开场前双方已经发生一次未公开细节的重大背叛。第一章必须通过符合角色人设的回忆、证据或对质逐步揭示，不得把双方写成初次见面。"
+      : betrayal >= 30
+        ? "开场前已经存在尚未说清的秘密或违约。身份标签表示当前立场，不代表双方互不认识。"
+        : affinity < 0
+          ? "开场前已经存在导致负面关系的冲突；第一章先揭示冲突原因，不从普通寒暄重新认识。"
+          : "沿用身份路线的开场关系，并根据三个数值决定距离、欲望与风险。",
+    stages: { affinity: a, corruption: c, betrayal: b },
+    openingChapter: {
+      title,
+      premise: centralConflict,
+      objective: "用第一章的具体事件说明三个开场数值为何同时成立，并让角色依照原作人格主动采取行动。",
+      requiredChoices: [
+        "正面处理关系与责任：主要改变好感度，并可能降低背叛值",
+        "回应或克制身体欲望：主要改变堕落／调教值，不自动改变好感度",
+        "隐瞒、诱导或继续越界：提高背叛值并形成新旗标",
+        "坦白、停止或承担代价：可能降低背叛值，但不会瞬间恢复信任"
+      ]
+    },
+    interpretation: centralConflict,
+    behaviorRules: [
+      `好感层级“${a.name}”决定${character}对用户的基本距离、信任与敌意。`,
+      `堕落／调教层级“${c.name}”决定欲望、禁忌好奇和亲密主题的主动程度。`,
+      `背叛层级“${b.name}”决定核验、隐瞒、对质、修复、反制与结局风险。`,
+      "同一个用户选择必须分别计算三项变化，允许一项上升而另一项下降。"
+    ],
+    endingCandidates,
+    consentRule: "身体欲望、生理反应、好感度、堕落／调教值和背叛值都不能替代当下明确同意。明确同意后，可以进入预先约定的强势、压制感或强迫感幻想；拒绝、撤回或真实无法退出时立即停止亲密行为。"
   };
 }
 
@@ -1153,6 +1300,11 @@ export function analyzeCharacter(input) {
   const requestedUserRole = normalizedText(input.userRole || "auto");
   const resolvedUserRole = requestedUserRole === "auto" ? (automaticRoles[input.realRelationship] || "stranger") : requestedUserRole;
   const userRole = buildUserRole({ roleId: resolvedUserRole, customDescription: input.userRoleCustom, character, work, motifs, canonPolicy });
+  const defaultInitialScore = userRole.initialScore;
+  const affinityStart = boundedScore(input.initialAffinity, defaultInitialScore, -100, 100);
+  userRole.defaultInitialScore = defaultInitialScore;
+  userRole.initialScore = affinityStart.value;
+  userRole.initialScoreCustomized = affinityStart.customized;
   userRole.selectionMode = requestedUserRole === "auto" ? "简单模式自动判定" : "用户明确选择";
   userRole.requestedRole = requestedUserRole;
   const adultSettings = buildAdultSettings(normalizedText(input.adultContent), input.adultConfirmed, subjectType, canonPolicy, {
@@ -1162,8 +1314,20 @@ export function analyzeCharacter(input) {
     userRole,
     character,
     userName: input.userName
-  });
+  }, input.initialCorruption);
   const affinity = buildAffinity(dialogueScenes, original, character, userRole, canonPolicy);
+  const betrayal = buildBetrayalSystem(input.initialBetrayal);
+  const initialRouteState = buildInitialRouteState({
+    affinity: affinity.initialScore,
+    corruption: adultSettings.corruptionSystem.initial,
+    betrayal: betrayal.initial,
+    character,
+    customized: affinityStart.customized || adultSettings.corruptionSystem.initialCustomized || betrayal.initialCustomized
+  });
+  if (initialRouteState.overridesIdentityOpening) {
+    userRole.baseOpening = userRole.opening;
+    userRole.opening = `开场采用“三数值组合优先”，直接进入《${initialRouteState.openingChapter.title}》。${initialRouteState.memorySeed} 当前“${userRole.label}”只表示阵营或剧情身份，不得再写成双方第一次见面。`;
+  }
   const evidenceNote = subjectType === "fictional"
     ? "性格词、关系和说话风格均来自来源文本或对白统计；好感度数值、行为阶段和新场景对白由应用规则原创，不属于游戏或小说官方内容。"
     : "现实人物资料由用户填写并只在本机整理；好感度、内心独白、分支剧情和新对白均为假设性规则演绎，不代表本人真实想法、承诺或行为。";
@@ -1174,7 +1338,9 @@ export function analyzeCharacter(input) {
     : "来源中没有提取到明确的性格描述，应用不做无依据补写。";
   const evidenceScenes = Object.entries(dialogueScenes).map(([name, values]) => `${name}：${values.length} 条原作对白`).join("；") || "尚未收录可分类的场景对白";
   const scenarioText = `用户剧情身份：${userRole.label}。${userRole.opening}\n资料覆盖：${evidenceScenes}`;
-  const firstMessage = dialogueScenes["初次见面"]?.[0]?.text || dialogues[0]?.text || "";
+  const firstMessage = initialRouteState.overridesIdentityOpening
+    ? `[应用原创开场：${initialRouteState.openingChapter.title}] ${character}已经认识你，也记得你们之间尚未揭开的冲突。角色将依据原作人格与三项开场数值主动开始对质、试探或行动。`
+    : dialogueScenes["初次见面"]?.[0]?.text || dialogues[0]?.text || "";
   const canonExamples = Object.entries(dialogueScenes).flatMap(([scene, values]) => values.slice(0, 2).map(item => `<START>\n[原作场景：${scene}]\n${character}：${item.text}`));
   const originalExamples = original.scenes.flatMap(scene => scene.stages.slice(2).flatMap(stage => stage.dialogues.slice(0, 1).map(item => `<START>\n[应用原创：${scene.name}｜${stage.name}]\n${character}：${item.text}`)));
   const examples = [...canonExamples, ...originalExamples].join("\n\n");
@@ -1210,7 +1376,7 @@ export function analyzeCharacter(input) {
           dialogue_count_exported: dialogues.length
         },
         subject_profile: { type: subjectType, work: work || (subjectType === "fictional" ? "未填写作品" : "现实人物"), gender: subjectGender, profileMode, relationship: normalizedText(input.realRelationship || "unsure"), realPermission: subjectType === "real" ? true : null, privacyNotice: subjectType === "fictional" ? "虚构角色" : "真人资料不得被当作本人真实内心或用于未经同意的露骨内容。" },
-        app_rules: { canon_policy: canonPolicy, affinity, original_dialogues: original, user_role: userRole, adult_content: adultSettings }
+        app_rules: { canon_policy: canonPolicy, affinity, betrayal, initial_route_state: initialRouteState, original_dialogues: original, user_role: userRole, adult_content: adultSettings }
       }
     }
   };

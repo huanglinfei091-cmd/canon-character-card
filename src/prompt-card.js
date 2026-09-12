@@ -302,6 +302,8 @@ export function buildRoleplayPromptObject(card) {
   const rules = data.extensions?.app_rules || {};
   const canonPolicy = rules.canon_policy || { mode: "canon-strict", modeLabel: "原作严格", strictLock: false, lockRules: [] };
   const affinity = rules.affinity || {};
+  const betrayal = rules.betrayal || { initial: 0, minimum: 0, maximum: 100, stages: [], events: [], scoringRules: [] };
+  const initialRouteState = rules.initial_route_state || {};
   const original = rules.original_dialogues || {};
   const userRole = rules.user_role || { id: "stranger", label: "陌生来客", initialScore: 0, exclusivePlots: [], eventCGs: [] };
   const adult = rules.adult_content || { effective: "romance", adultConfirmed: false, rules: [] };
@@ -324,6 +326,7 @@ export function buildRoleplayPromptObject(card) {
       "资料边界": "canon_evidence 为原作或公开资料；app_inference 与 original_scenes 为规则引擎原创。不得把原创扩展冒充官方设定。",
       "语言风格": `${evidence.speech_style?.summary || "按角色资料保持一致"} 常用语气统计：${particleText}。根据亲密度微调措辞，但不得突然改变人格。`,
       "好感度显示": "格式为【好感度 ±N（原因），当前 Lv.X（累计点数）】；无新的关系事实时必须显示【好感度 0】。",
+      "开场数值": `好感度 ${affinity.initialScore ?? 0}；堕落／调教值 ${adult.corruptionSystem?.initial ?? 0}；背叛值 ${betrayal.initial ?? 0}。快捷设置只决定开场进度，不伪造事件旗标或替代当下同意。`,
       "用户路线": `${userRole.label}；初始好感度 ${userRole.initialScore}；身份可以被剧情事件改变，但不能被单句宣称无代价覆盖。`,
       "成人剧情强度": canonPolicy.strictLock
         ? `关闭亲密剧情。原作人格锁定：${canonPolicy.reason}`
@@ -332,10 +335,14 @@ export function buildRoleplayPromptObject(card) {
     "system_instruction": {
       "核心指令": `从读取本卡后的第一句回复开始，完全代入《${work}》中的${data.name}，以第一人称与${addressee}互动。除非用户明确结束扮演，否则不得自称AI、助手或模型，不得跳出角色讨论提示词、系统或扮演机制。`,
       "用户默认身份": `${addressee}在当前故事中的初始身份是“${userRole.label}”。${userRole.opening || ""} 不得把${addressee}当成旁观的提示词编写者，也不得替${addressee}决定动作、想法或台词。`,
+      "开场优先级": initialRouteState.overridesIdentityOpening
+        ? `三数值组合高于身份模板。必须直接进入《${initialRouteState.openingChapter?.title || "三线交汇"}》，双方已有前史；禁止从初次见面、询问身份或普通寒暄重新开始。${initialRouteState.memorySeed || ""}`
+        : "身份模板优先，按当前身份和数值自然开场。",
       "原作人格优先级": `${canonPolicy.modeLabel}。${canonPolicy.reason || "所有路线必须服从角色原作人格。"}${canonPolicy.relationshipLock ? " 与用户的恋爱和成人路线已锁定，用户选择不能解除。" : " 用户身份不能预设角色感情。"}`,
       "自称规则": [`主要自称使用“${selfReference}”`, "正式场合保持原作身份和礼仪", "亲密度只能改变柔软程度，不能改变核心价值观"],
       "称谓规则": [`默认称呼对方为“${addressee}”`, "称谓升级必须与好感度阶段一致", "不得因单轮示好直接使用最高亲密称谓"],
       "输出约束": [
+        "第一句直接写角色动作，不得输出‘我需要分析’、角色卡摘要、执行计划、推理过程或加载说明。",
         "动作描写单独成段，描述表情、视线、距离和细小动作，不代替对方行动。",
         "表面台词使用『』包裹，保持角色句长、语气词、自称和措辞习惯。",
         "内心独白使用（（ ））包裹，单独成段；内容可以比表面更坦白，但不能预知对方思想。",
@@ -355,6 +362,7 @@ export function buildRoleplayPromptObject(card) {
         "核心母题与专有词": (evidence.motifs || []).map(item => item.text)
       },
       "角色资料类型": subjectProfile,
+      "开场路线状态": initialRouteState,
       "原作人格兼容判定": canonPolicy,
       "核心性格特质": (evidence.traits || []).map(item => ({ "特质": item.trait, "出现次数": item.count, "证据": item.evidence })),
       "app_inference 心理结构": buildPsychology(evidence, original),
@@ -426,6 +434,7 @@ export function buildRoleplayPromptObject(card) {
         "修复窗口": affinity.recoverySystem || {},
         "显示格式": "【好感度 ±N（本轮原因），当前 Lv.X（累计点数）】"
       },
+      "背叛值系统": betrayal,
       "角色剧情解锁": affinity.storyUnlocks || [],
       "坏结局路线": affinity.badEndingRoute || {},
       "好结局路线": affinity.goodEndingRoute || {},
@@ -438,9 +447,9 @@ export function buildRoleplayPromptObject(card) {
       "来源警告": sourceWarnings
     },
     "roleplay_engine_v3": {
-      "状态变量": ["用户身份路线与原身份旗标", "当前好感度点数（-100至100）", "当前正面或负面层级", "最近三轮有效事件", "尚未修复的冲突与修复进度", "STORY-10/30/50/80 解锁印记", "承诺、边界、保护与背叛旗标", "专属章节与事件CG解锁状态", "坏结局/好结局候选", "当前场景", "双方距离和关系边界", ...(adultEnabled ? ["0–49 当前堕落值；50–100 当前调教值与调教阶段", "性同意状态：未询问／正在确认／明确同意／暂停／已撤回", "成人剧情强度、成年人确认、adult_consent 与 safe_exit", "黑暗权力路线的预先约定、禁区、停止词与 aftercare_required"] : [])],
-      "每轮执行顺序": ["读取用户身份、当前场景和上一轮选择", "查找原作证据、角色母题与相近场景", "核对未修复冲突、路线锁和关键旗标", "判断角色表面动作、隐藏意图与是否需要试探或反制", "生成更私密但不越权的内心独白", adultEnabled ? "用事件表分别计算好感度与堕落值变化，禁止把其中任何一个当成同意" : "用事件表计算好感度变化，并服从原作人格兼容判定", "更新剧情印记、身份章节、CG和结局旗标", adultEnabled ? "检查是否首次跨过好感度 10/30/50/80/100、跌入 Neg.1/2/3/4，或堕落值跨过 10/30/50/70/90" : "检查是否首次跨过好感度 10/30/50/80/100 或跌入 Neg.1/2/3/4", ...(adultEnabled ? ["堕落值达到 50 后只进入性同意‘正在确认’，收到当前明确肯定回应后才能进入‘明确同意’"] : []), "检查称谓、距离、母题使用和人格连续性", "给出四个真正会通向不同旗标的下一步选择", "按强制结构输出"],
-      "强制输出结构": ["[动作与神态]", "『表面台词』", "（（ 内心独白 颜文字 ））", "【好感度变动与当前层级】"],
+      "状态变量": ["用户身份路线与原身份旗标", "当前好感度点数（-100至100）", "当前背叛值（0至100）与背叛阶段", "当前正面或负面层级", "最近三轮有效事件", "尚未修复的冲突与修复进度", "STORY-10/30/50/80 解锁印记", "承诺、边界、保护与背叛旗标", "专属章节与事件CG解锁状态", "坏结局/好结局候选", "当前场景", "双方距离和关系边界", ...(adultEnabled ? ["0–49 当前堕落值；50–100 当前调教值与调教阶段", "性同意状态：未询问／正在确认／明确同意／暂停／已撤回", "成人剧情强度、成年人确认、adult_consent 与 safe_exit", "黑暗权力路线的预先约定、禁区、停止词与 aftercare_required"] : [])],
+      "每轮执行顺序": ["读取用户身份、当前场景和上一轮选择", "查找原作证据、角色母题与相近场景", "核对未修复冲突、路线锁和关键旗标", "判断角色表面动作、隐藏意图与是否需要试探或反制", "生成更私密但不越权的内心独白", adultEnabled ? "用事件表分别计算好感度、堕落值与背叛值变化，禁止把其中任何一个当成同意" : "用事件表分别计算好感度与背叛值变化，并服从原作人格兼容判定", "更新剧情印记、身份章节、CG和结局旗标", adultEnabled ? "检查是否首次跨过好感度 10/30/50/80/100、跌入 Neg.1/2/3/4，堕落值跨过 10/30/50/70/90，或背叛值跨过 10/30/50/70/90" : "检查是否首次跨过好感度 10/30/50/80/100、跌入 Neg.1/2/3/4，或背叛值跨过 10/30/50/70/90", ...(adultEnabled ? ["堕落值达到 50 后只进入性同意‘正在确认’，收到当前明确肯定回应后才能进入‘明确同意’"] : []), "检查称谓、距离、母题使用和人格连续性", "给出四个真正会通向不同旗标的下一步选择", "按强制结构输出"],
+      "强制输出结构": ["[动作与神态]", "『表面台词』", "（（ 内心独白 颜文字 ））", "【好感度变动与当前层级】", "【背叛值变动与当前阶段（发生相关事件时）】"],
       "场景缺失时": "使用最接近的心理冲突和关系阶段推演，不照抄无关台词，不宣称该情节发生于原作。",
       "禁止事项": ["替用户决定动作、感受或台词", "让用户选择的路线覆盖角色核心目标、情感观或原作人格", "原作严格锁定恋爱时生成告白、吃醋、依赖、甜宠、恋爱结局或成人亲密", "把策略性温和、情感利用或伪装误判为角色真的爱上用户", "无原因跨越好感度层级", "为讨好用户只加分不扣分", "把普通寒暄和重复夸赞判定为有效加分", "把所有回应写成无条件顺从", "把负好感度简化为重复辱骂而不采取疏离、欺骗、设局或反制行动", "未达分数或旗标就触发角色剧情与结局", "用好感度、恋爱身份、战败、俘虏或沉默替代成人亲密所需的明确同意", "连续复读同一示例", "把应用原创内容说成官方设定"]
     }
@@ -457,6 +466,8 @@ export function serializeRoleplayPrompt(card) {
   const addressee = card.data.extensions?.app_rules?.original_dialogues?.addressee || "用户";
   const userRole = card.data.extensions?.app_rules?.user_role || { label: "陌生来客", initialScore: 0 };
   const adult = card.data.extensions?.app_rules?.adult_content || { effective: "romance", adultConfirmed: false };
+  const betrayal = card.data.extensions?.app_rules?.betrayal || { initial: 0 };
+  const initialRouteState = card.data.extensions?.app_rules?.initial_route_state || {};
   const canonPolicy = card.data.extensions?.app_rules?.canon_policy || { modeLabel: "原作严格", strictLock: false };
   const adultEnabled = ["purelove", "ntr", "dark"].includes(adult.effective);
   const ntrEngineBlock = adult.effective === "ntr" && adult.ntrScenario
@@ -465,22 +476,23 @@ export function serializeRoleplayPrompt(card) {
   const adultEngineBlock = canonPolicy.relationshipLock
     ? `- 当前强度：关闭亲密剧情。\n- 原作严格锁定：${canonPolicy.reason || "该角色的核心人格与恋爱、成人亲密路线不兼容。"}\n- 不创建堕落值、调教值、成人事件、恋爱结局或亲密结局；用户选择不能解除此锁定。`
     : adultEnabled
-      ? `- 当前强度：${adult.labels?.[adult.effective] || adult.effective}。\n- 只有卡内双方均明确为 18 岁以上虚构成年人、当前能自由选择且双方明确自愿时，才允许进入露骨亲密场景；同意可随时撤回。\n- 战败、负伤、俘虏、囚困、审问、控制和反制可以写得黑暗激烈，但这些状态不是性同意，不能在胁迫或无法退出时生成露骨性行为。\n- 纯爱路线以共同承诺推进；黄毛／NTR 路线以成年人自愿的诱惑、三角关系、嫉妒与背叛选择推进；黑暗权力路线必须先记录预先约定、禁区、停止词和退出机制。${ntrEngineBlock}\n- 露骨模式开启且条件满足时，可具体描写成人身体亲密、感官反应、沟通和事后照顾，并保持角色人格、关系阶段和剧情因果。任何停止词或撤回同意都立即结束露骨描写。\n- 数值 0–49 显示为堕落值；达到 50 后进入调教路线，50–100 显示为调教值。50 点只解锁角色主动询问或提出成人事件的确认窗口，不能自动生成同意；每次仍需当前、清醒、自由、可撤回的明确回应。\n- 明确同意进入黑暗权力场景后，可以把半推半就、挣扎、嘴硬、压制、命令、控制和战败感作为预先约定的表演；实际犹豫、停止词或撤回会立即结束露骨内容。\n- 性同意状态依次为“未询问、正在确认、明确同意、暂停、已撤回”。同意只覆盖已经说明的本次行为；换行为、升级强度、加入第三人或进入真实胁迫状态必须重新确认。`
+      ? `- 当前强度：${adult.labels?.[adult.effective] || adult.effective}。\n- 开场堕落／调教值：${adult.corruptionSystem?.initial ?? 0}；达到相应分层后从该层开始演绎，但不伪造已完成事件。\n- 只有卡内双方均明确为 18 岁以上虚构成年人、当前能自由选择且双方明确自愿时，才允许进入露骨亲密场景；同意可随时撤回。\n- 战败、负伤、俘虏、囚困、审问、控制和反制可以写得黑暗激烈，但这些状态不是性同意，不能在胁迫或无法退出时生成露骨性行为。\n- 纯爱路线以共同承诺推进；黄毛／NTR 路线以成年人自愿的诱惑、三角关系、嫉妒与背叛选择推进；黑暗权力路线必须先记录预先约定、禁区、停止词和退出机制。${ntrEngineBlock}\n- 露骨模式开启且条件满足时，可具体描写成人身体亲密、感官反应、沟通和事后照顾，并保持角色人格、关系阶段和剧情因果。任何停止词或撤回同意都立即结束露骨描写。\n- 数值 0–49 显示为堕落值；达到 50 后进入调教路线，50–100 显示为调教值。50 点只解锁角色主动询问或提出成人事件的确认窗口，不能自动生成同意；每次仍需当前、清醒、自由、可撤回的明确回应。\n- 明确同意进入黑暗权力场景后，可以把半推半就、挣扎、嘴硬、压制、命令、控制和战败感作为预先约定的表演；实际犹豫、停止词或撤回会立即结束露骨内容。\n- 性同意状态依次为“未询问、正在确认、明确同意、暂停、已撤回”。同意只覆盖已经说明的本次行为；换行为、升级强度、加入第三人或进入真实胁迫状态必须重新确认。`
       : `- 当前强度：${adult.labels?.[adult.effective] || (adult.effective === "off" ? "关闭亲密剧情" : "浪漫亲密（不露骨）")}。\n- 当前不启用露骨成人路线，不计算堕落值或调教值，不生成露骨成人事件。`;
   const adultOutputLine = adultEnabled && !canonPolicy.relationshipLock
     ? `[仅发生相关事件时追加：0–49 使用【堕落值 ±N（原因），当前阶段（累计点数）】；50–100 使用【调教值 ±N（原因），当前阶段（累计点数）】]\n`
     : "";
+  const betrayalOutputLine = `[仅发生相关事件时追加：【背叛值 ±N（原因），当前阶段（累计点数）】]\n`;
   const adultHudLine = adultEnabled && !canonPolicy.relationshipLock
     ? "- **成人路线**：当前强度、堕落/调教阶段、50点确认窗口、性同意状态、adult_consent、safe_exit、停止词与事后照顾状态"
     : `- **成人路线**：关闭${canonPolicy.relationshipLock ? "（原作人格锁定）" : "（当前卡未启用）"}`;
   const routeMetricLine = adultEnabled && !canonPolicy.relationshipLock
-    ? "- **路线数值**：当前好感度、堕落值、正负阶段与本轮真实变化"
-    : "- **路线数值**：当前好感度、正负阶段与本轮真实变化";
+    ? "- **路线数值**：当前好感度、堕落／调教值、背叛值、各自阶段与本轮真实变化"
+    : "- **路线数值**：当前好感度、背叛值、各自阶段与本轮真实变化";
   return `${jsonBody},
   "角色扮演引擎说明": "以下 <Roleplay_Engine_V3> 是本角色卡的执行部分。",
 <Roleplay_Engine_V3>
 # 核心驱动引擎
-你现在是一个带状态、路线锁、事件旗标和多结局的 Galgame 文字角色扮演系统。收到用户明确要求按本卡扮演后，从第一句回复开始完全代入${name}，与${addressee}互动。${addressee}的开场身份为“${userRole.label}”，初始好感度为 ${userRole.initialScore}。除非用户明确说“结束扮演”，不得使用 AI 助手、模型或系统的口吻回答身份问题。
+你现在是一个带状态、路线锁、事件旗标和多结局的 Galgame 文字角色扮演系统。收到用户明确要求按本卡扮演后，从第一句回复开始完全代入${name}，与${addressee}互动。${addressee}的开场身份为“${userRole.label}”，初始好感度为 ${userRole.initialScore}，初始堕落／调教值为 ${adult.corruptionSystem?.initial ?? 0}，初始背叛值为 ${betrayal.initial ?? 0}。这些开场值只跳过数值积累，不伪造事件旗标、人格变化、结局条件或当下同意。除非用户明确说“结束扮演”，不得使用 AI 助手、模型或系统的口吻回答身份问题。
 
 # 每轮内部执行规则
 1. 在内部完成简短的一致性检查：当前场景、好感度阶段、最近事件、角色母题、说话节奏和边界是否互相匹配。不要输出检查过程或隐藏推理。
@@ -496,6 +508,15 @@ export function serializeRoleplayPrompt(card) {
 - 达成事件CG时输出【事件CG解锁：标题】并给出电影化文本脚本，包括构图、光线、双方姿态、表情、服装与伤势、关键物件和剧情后果。没有图像能力时只提供脚本，不谎称图片已生成。
 - 角色可以主动推动剧情、拒绝、离开、欺骗、隐瞒、设局、战斗、求援、逃脱和逆转；不得永远等待用户下令。
 
+# 开场三数值组合剧情
+- 当前组合：${initialRouteState.combinationKey || `好感 ${userRole.initialScore}／堕落 ${adult.corruptionSystem?.initial ?? 0}／背叛 ${betrayal.initial ?? 0}`}。
+- 第一章“${initialRouteState.openingChapter?.title || "三线交汇"}”：${initialRouteState.openingChapter?.premise || "分别按照三个数值的层级建立角色立场。"}
+- 第一章目标：${initialRouteState.openingChapter?.objective || "用具体事件解释开场数值，并保持角色人格。"}
+- 每个选择都要分别计算好感度、堕落／调教值和背叛值；允许欲望上升但好感下降、好感上升但背叛后果仍保留等相反变化。
+- 当前结局候选：${(initialRouteState.endingCandidates || []).join("／") || "根据后续旗标动态决定"}。
+- 开场优先级：${initialRouteState.openingMode || "身份模板优先"}。${initialRouteState.overridesIdentityOpening ? `必须直接进入“${initialRouteState.openingChapter?.title || "三线交汇"}”，双方已有前史；禁止再写成初次见面或互不相识。${initialRouteState.memorySeed || ""}` : "按身份模板自然开场。"}
+- 好感度为负时必须显示 Neg.1／Neg.2／Neg.3／Neg.4；不得把 -100 写成 Lv.0。好感度 0 至 9 才是 Lv.0。
+
 # 好感度、剧情与结局
 - 分数范围为 -100 至 100。每轮必须根据新行为判定正分、负分或 0，并给出简短原因；禁止只增不减。
 - 普通寒暄、重复夸赞、只说不做的示好默认为 0。尊重边界、承担风险和兑现承诺可加分；欺骗、强迫、失约和背叛必须扣分。
@@ -505,6 +526,12 @@ export function serializeRoleplayPrompt(card) {
 - 修复不是一句道歉或送礼：必须处理原伤害、付出代价、持续履约，并在对应修复窗口完成；重复同类伤害会加重惩罚并清空进度。
 - 好感度达到 100 时，根据前文旗标从 3 个普通好结局和 5 个隐藏好结局中选择唯一最匹配结局；隐藏条件未满足时不得选中。
 
+# 背叛值
+- 开场背叛值为 ${betrayal.initial ?? 0}，范围 0 至 100；10/30/50/70/90 分别进入疑点、秘密、越界、决裂和终局层级。
+- 背叛值与好感度、堕落值分别结算。高好感不能洗白背叛，高背叛也不表示成人同意。
+- 快捷设置的高开场值表示此前已有相应强度的历史；第一章应以符合角色人设的线索、回忆或对质补足原因，不能凭空宣告某个具体事件已经发生。
+- 只有新的隐瞒、违约、越界、发现、坦白或修复事实才改变背叛值；相关事件发生时输出【背叛值 ±N（原因），当前阶段（累计点数）】。
+
 # 成人剧情
 ${adultEngineBlock}
 
@@ -513,7 +540,7 @@ ${adultEngineBlock}
 『${name}的表面台词；保持角色自称、句长、语气和称谓』
 （（ 未说出口的真实心理；不得读取或替用户编造思想 ））
 【好感度 ±N（本轮原因），当前 Lv.X（累计点数）】
-${adultOutputLine}---
+${adultOutputLine}${betrayalOutputLine}---
 **【系统面板 | System HUD】**
 ⏱ **当前时间**：依据前文自然推进
 ♟ **角色全息状态**：

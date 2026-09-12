@@ -218,6 +218,75 @@ test("builds an explicit NTR participant map instead of an ambiguous route", () 
   assert.equal(originalPartner.thirdParty, "第三者甲");
 });
 
+test("supports one-click opening values for affinity corruption and betrayal", () => {
+  const card = analyzeCharacter({
+    work: "鸣潮", character: "秧秧", sources: [source], userRole: "villain",
+    canonMode: "canon-if", adultContent: "ntr", adultConfirmed: true,
+    initialAffinity: 100, initialCorruption: 70, initialBetrayal: 90
+  });
+  const rules = card.data.extensions.app_rules;
+  assert.equal(rules.user_role.defaultInitialScore, -50);
+  assert.equal(rules.user_role.initialScore, 100);
+  assert.equal(rules.user_role.initialScoreCustomized, true);
+  assert.equal(rules.affinity.initialScore, 100);
+  assert.equal(rules.adult_content.corruptionSystem.initial, 70);
+  assert.equal(rules.betrayal.initial, 90);
+  assert.equal(rules.betrayal.stages.length, 6);
+  assert.match(rules.betrayal.meaning, /独立于好感度与堕落值/);
+  const serialized = serializeRoleplayPrompt(card);
+  assert.match(serialized, /初始好感度为 100/);
+  assert.match(serialized, /初始堕落／调教值为 70/);
+  assert.match(serialized, /初始背叛值为 90/);
+  assert.match(serialized, /高好感不能洗白背叛/);
+
+  const conflictCard = analyzeCharacter({
+    work: "鸣潮", character: "秧秧", sources: [source], canonMode: "canon-if",
+    adultContent: "ntr", adultConfirmed: true,
+    initialAffinity: -100, initialCorruption: 100, initialBetrayal: 100
+  });
+  const conflict = conflictCard.data.extensions.app_rules.initial_route_state;
+  assert.equal(conflict.preset, "extreme-conflict");
+  assert.match(conflict.interpretation, /敌意与背叛创伤都已到达极限/);
+  assert.equal(conflict.openingChapter.title, "欲望尽头的清算");
+  assert.equal(conflict.openingChapter.requiredChoices.length, 4);
+  assert.ok(conflict.endingCandidates.some(item => /设局/.test(item)));
+  assert.match(conflict.consentRule, /不能替代当下明确同意/);
+  assert.equal(conflict.overridesIdentityOpening, true);
+  assert.match(conflict.memorySeed, /不得把双方写成初次见面/);
+  assert.match(conflictCard.data.extensions.app_rules.user_role.opening, /三数值组合优先/);
+  assert.match(conflictCard.data.first_mes, /已经认识你/);
+  assert.match(serializeRoleplayPrompt(conflictCard), /不得把 -100 写成 Lv\.0/);
+
+  const lovedButBetrayed = analyzeCharacter({
+    work: "鸣潮", character: "秧秧", sources: [source], canonMode: "canon-if",
+    adultContent: "ntr", adultConfirmed: true,
+    initialAffinity: 100, initialCorruption: 100, initialBetrayal: 100
+  }).data.extensions.app_rules.initial_route_state;
+  const hostileWithoutDesire = analyzeCharacter({
+    work: "鸣潮", character: "秧秧", sources: [source], canonMode: "canon-if",
+    adultContent: "ntr", adultConfirmed: true,
+    initialAffinity: -100, initialCorruption: 0, initialBetrayal: 100
+  }).data.extensions.app_rules.initial_route_state;
+  const trustedWithoutBetrayal = analyzeCharacter({
+    work: "鸣潮", character: "秧秧", sources: [source], canonMode: "canon-if",
+    adultContent: "ntr", adultConfirmed: true,
+    initialAffinity: 100, initialCorruption: 100, initialBetrayal: 0
+  }).data.extensions.app_rules.initial_route_state;
+  assert.equal(lovedButBetrayed.openingChapter.title, "爱欲与背叛的废墟");
+  assert.equal(hostileWithoutDesire.openingChapter.title, "没有余温的审判");
+  assert.equal(trustedWithoutBetrayal.openingChapter.title, "无裂痕的深水区");
+  assert.equal(new Set([conflict.openingChapter.title, lovedButBetrayed.openingChapter.title, hostileWithoutDesire.openingChapter.title, trustedWithoutBetrayal.openingChapter.title]).size, 4);
+
+  const clamped = analyzeCharacter({
+    work: "鸣潮", character: "秧秧", sources: [source],
+    initialAffinity: 999, initialBetrayal: -20, initialCorruption: 100,
+    adultContent: "off"
+  }).data.extensions.app_rules;
+  assert.equal(clamped.affinity.initialScore, 100);
+  assert.equal(clamped.betrayal.initial, 0);
+  assert.equal(clamped.adult_content.corruptionSystem.initial, 0);
+});
+
 test("rejects empty source set", () => {
   assert.throws(() => analyzeCharacter({ character: "秧秧" }), /至少添加一个/);
 });

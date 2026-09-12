@@ -20,7 +20,8 @@
 9. 支持虚构角色，也支持为本人或已同意的现实人物填写简单/复杂人设。真人卡不生成露骨内容，应用推演的内心和剧情不会冒充本人真实想法。
 10. 可选择关闭亲密、浪漫不露骨、纯爱成人、黄毛/NTR 成人或预先协商的黑暗权力幻想。NTR 可选择被夺者、黄毛第三者或角色第三者视角，并明确原关系对象和第三者；路线从原关系、诱因、动摇、越界选择推进到发现与后果，不开场强制背叛。露骨模式只适用于卡内相关人物均为 18 岁以上的虚构成年人，并要求当前场景明确、自愿、可撤回的同意；原作严格锁定的角色不会生成这些路线。
 11. 成人路线包含独立的 0–100 堕落值和性同意状态机；50 点开启确认窗口，但不会用数值替角色自动同意。
-12. 导出 Character Card V3 JSON、Word DOCX 和启动指令 TXT。
+12. 开场数值支持直接输入、`+10`、跳到下一档、单项拉满、“三项一键 +10／+50／拉满”，以及“极端冲突 -100／100／100”。好感度、堕落／调教值和新增的 0–100 背叛值会写入 Word、JSON 与启动指令。不同组合会生成不同的第一章、角色立场、选择后果和结局候选，不是只更换面板数字；快捷值不会伪造事件旗标、覆盖人设或替代同意。
+13. 导出 Character Card V3 JSON、Word DOCX 和启动指令 TXT。
 
 > 应用不会自动变成角色。将导出的 Word/JSON 上传到你要使用的 AI，再发送应用生成的“启动指令”，AI 才会按该角色卡扮演。
 
@@ -28,7 +29,7 @@
 
 ### Windows
 
-1. 从 [Releases](https://github.com/huanglinfei091-cmd/canon-character-card/releases) 下载最新的 `CanonCharacterCard-Windows-x64-v1.2.2.zip`。
+1. 从 [Releases](https://github.com/huanglinfei091-cmd/canon-character-card/releases) 下载最新的 `CanonCharacterCard-Windows-x64-v1.2.3.zip`。
 2. 完整解压 ZIP，不要直接在压缩包内运行。
 3. 双击 `原作角色卡整理器.exe`。
 
@@ -36,7 +37,7 @@
 
 ### Android
 
-1. 从 [Releases](https://github.com/huanglinfei091-cmd/canon-character-card/releases) 下载最新的 `CanonCharacterCard-Android-v1.2.2.apk`。
+1. 从 [Releases](https://github.com/huanglinfei091-cmd/canon-character-card/releases) 下载最新的 `CanonCharacterCard-Android-v1.2.3.apk`。
 2. 在手机上打开 APK，按 Android 提示允许此次安装。
 3. 安装后打开“原作角色卡整理器”。导出时会调用系统分享/保存面板。
 
