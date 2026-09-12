@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#153d46">
+  <title>原作角色卡整理器</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect rx='16' width='64' height='64' fill='%23153d46'/><path d='M18 17h28v30H18z' fill='%23fff'/><path d='M25 26h14M25 33h14M25 40h9' stroke='%23153d46' stroke-width='3' stroke-linecap='round'/></svg>">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="回到顶部">
+      <span class="brand-mark">卡</span>
+      <span><strong>原作角色卡整理器</strong><small>把已有设定和对白整理成可用角色卡</small></span>
+    </a>
+    <div class="status-pills" aria-label="运行方式">
+      <span>本地运行</span><span>不接模型</span><span>不填密钥</span>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <p class="eyebrow">CANON CARD WORKSHOP</p>
+      <h1>输入作品与角色，整理一份有证据、有层次的角色卡</h1>
+      <p>应用从公开网页和你导入的游戏文本中提取设定、关系与原作对白，再用固定写作规则补充好感度行为和新场景反应。原作与原创永远分开标注。</p>
+    </section>
+
+    <div class="workspace">
+      <aside class="control-panel" aria-label="角色资料配置">
+        <section class="panel-section">
+          <div class="section-heading"><span>01</span><div><h2>角色</h2><p>告诉应用要整理谁</p></div></div>
+          <div class="field-grid two">
+            <label>作品名<input id="work" value="鸣潮" placeholder="例如：鸣潮、原神、剑来"></label>
+            <label>角色名<input id="character" value="秧秧" placeholder="例如：秧秧、爱弥斯、宁姚"></label>
+          </div>
+          <label>角色如何称呼你 <span class="optional">可选</span><input id="user-name" placeholder="留空时使用“你”"></label>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-heading"><span>02</span><div><h2>寻找公开资料</h2><p>不需要搜索密钥</p></div></div>
+          <div class="search-row">
+            <input id="search-query" aria-label="搜索词" placeholder="自动使用作品名和角色名">
+            <button id="search-btn" class="button primary">搜索</button>
+          </div>
+          <p class="hint">优先选择官方百科、带章节依据的百科和公开数据仓库。搜索结果需要你点击“加入资料”。</p>
+          <div id="search-results" class="result-list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-heading"><span>03</span><div><h2>导入游戏或小说文本</h2><p>JSON、CSV、TXT、JSONL</p></div></div>
+          <label class="drop-zone" for="files">
+            <input id="files" type="file" multiple accept=".json,.jsonl,.csv,.txt,.md">
+            <span class="drop-icon">＋</span>
+            <strong>选择文件或整个资料文件夹</strong>
+            <small>支持 GenshinTexts、GenshinDialog 和普通对白文本；文件只在本机处理</small>
+          </label>
+          <div id="file-list" class="compact-list"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-heading"><span>04</span><div><h2>已选资料</h2><p>每条会写入来源清单</p></div></div>
+          <div id="source-list" class="compact-list empty-state">还没有资料</div>
+          <label>最多导出多少条原作对白
+            <select id="dialogue-limit">
+              <option value="50">50 条</option>
+              <option value="200" selected>200 条</option>
+              <option value="1000">1000 条</option>
+              <option value="all">全部</option>
+            </select>
+          </label>
+        </section>
+
+        <button id="build-btn" class="button build">自动查资料并整理角色卡</button>
+        <p id="status" class="status" aria-live="polite"></p>
+      </aside>
+
+      <section class="preview-panel" aria-label="角色卡预览">
+        <div class="preview-toolbar">
+          <div><p class="eyebrow">CARD PREVIEW</p><h2 id="preview-title">等待整理</h2></div>
+          <div class="export-actions">
+            <button id="launch-btn" class="button secondary" disabled>获取启动指令</button>
+            <button id="json-btn" class="button secondary" disabled>导出 JSON</button>
+            <button id="docx-btn" class="button primary" disabled>导出 Word</button>
+          </div>
+        </div>
+        <nav id="tabs" class="tabs" aria-label="预览分类">
+          <button class="active" data-tab="overview">概览</button>
+          <button data-tab="canon">原作证据</button>
+          <button data-tab="original">原创场景</button>
+          <button data-tab="affinity">好感度</button>
+          <button data-tab="prompt">扮演指令</button>
+          <button data-tab="sources">来源</button>
+        </nav>
+        <div id="preview" class="preview-content">
+          <div class="welcome-card">
+            <div class="welcome-symbol">原</div>
+            <h3>角色不会从空白里出现</h3>
+            <p>先加入至少一个网页或资料文件。应用会展示它实际找到了多少人物证据、多少原作对白，以及依据这些信息原创了哪些好感度行为和场景对白。</p>
+            <ul>
+              <li><b>原作证据</b>：可追溯到网页或导入文件</li>
+              <li><b>应用原创</b>：固定规则写作，不冒充官方</li>
+              <li><b>缺失内容</b>：明确留空，不伪造来源</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <template id="loading-template"><div class="loading"><span></span><p>正在处理…</p></div></template>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

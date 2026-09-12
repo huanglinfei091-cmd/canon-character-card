@@ -1,0 +1,9 @@
+{
+  "appId": "com.canoncard.app",
+  "appName": "原作角色卡整理器",
+  "webDir": "dist-native",
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  },
+  "android": { "allowMixedContent": false }
+}
