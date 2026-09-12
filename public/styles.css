@@ -16,7 +16,7 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--canvas); color: var(--ink); min-width: 320px; }
-button, input, select { font: inherit; }
+button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .48; }
 
@@ -60,9 +60,17 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 label { display: block; color: #394c52; font-size: 13px; font-weight: 700; margin-top: 14px; }
 label:first-of-type { margin-top: 0; }
 .optional { color: var(--muted); font-weight: 500; }
-input, select { width: 100%; min-height: 46px; margin-top: 7px; padding: 10px 12px; color: var(--ink); background: #fbfcfc; border: 1px solid #cbd7d9; border-radius: 10px; outline: none; transition: border-color .18s, box-shadow .18s; }
-input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(46, 113, 123, .14); }
+input, select, textarea { width: 100%; min-height: 46px; margin-top: 7px; padding: 10px 12px; color: var(--ink); background: #fbfcfc; border: 1px solid #cbd7d9; border-radius: 10px; outline: none; transition: border-color .18s, box-shadow .18s; }
+textarea { resize: vertical; line-height: 1.55; }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(46, 113, 123, .14); }
 .field-grid.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.profile-fields { margin: 12px 0; padding: 14px; display: grid; gap: 12px; border: 1px solid var(--line); border-radius: 12px; background: #f6f9f9; }
+.profile-fields[hidden], [hidden] { display: none !important; }
+.check-card { align-self: end; min-height: 46px; margin-top: 7px; padding: 9px 11px; display: flex; align-items: center; gap: 10px; border: 1px solid #cbd7d9; border-radius: 10px; background: #fbfcfc; cursor: pointer; }
+.check-card input { width: 19px; min-height: 19px; margin: 0; flex: 0 0 auto; accent-color: var(--accent); }
+.check-card span { display: grid; gap: 2px; }
+.check-card b { font-size: 12px; line-height: 1.3; }
+.check-card small { color: var(--muted); font-size: 10px; line-height: 1.35; }
 .search-row { display: grid; grid-template-columns: 1fr auto; gap: 9px; align-items: end; }
 .search-row input { margin: 0; }
 .hint { margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }

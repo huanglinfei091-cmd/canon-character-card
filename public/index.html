@@ -29,15 +29,89 @@
     <div class="workspace">
       <aside class="control-panel" aria-label="角色资料配置">
         <section class="panel-section">
-          <div class="section-heading"><span>01</span><div><h2>角色</h2><p>告诉应用要整理谁</p></div></div>
+          <div class="section-heading"><span>01</span><div><h2>角色与路线</h2><p>告诉应用角色是谁、你在故事里是谁</p></div></div>
           <div class="field-grid two">
-            <label>作品名<input id="work" value="鸣潮" placeholder="例如：鸣潮、原神、剑来"></label>
-            <label>角色名<input id="character" value="秧秧" placeholder="例如：秧秧、爱弥斯、宁姚"></label>
+            <label>作品名<input id="work" placeholder="例如：鸣潮、原神、剑来；真人可填“现实”"></label>
+            <label>角色名<input id="character" placeholder="例如：秧秧、爱弥斯、宁姚或现实人物昵称"></label>
+          </div>
+          <div class="field-grid two">
+            <label>角色类型
+              <select id="subject-type">
+                <option value="fictional" selected>游戏／小说等虚构角色</option>
+                <option value="self">现实中的我自己</option>
+                <option value="real">现实中的其他人（需本人同意）</option>
+              </select>
+            </label>
+            <label>人设填写方式
+              <select id="profile-mode">
+                <option value="simple" selected>简单选择，应用自动安排</option>
+                <option value="complex">复杂人设，我自己写</option>
+              </select>
+            </label>
           </div>
           <label>角色如何称呼你 <span class="optional">可选</span><input id="user-name" placeholder="留空时使用“你”"></label>
+          <div class="field-grid two">
+            <label>你的剧情身份
+              <select id="user-role">
+                <option value="auto" selected>我不知道，让应用决定</option>
+                <option value="stranger">陌生来客</option>
+                <option value="friend">好友／旧友</option>
+                <option value="protagonist">主角</option>
+                <option value="companion">同伴</option>
+                <option value="rival">宿敌</option>
+                <option value="enemy">敌人</option>
+                <option value="villain">反派</option>
+                <option value="romance">恋爱候选</option>
+                <option value="mystery">？？？隐藏身份</option>
+                <option value="custom">自定义身份</option>
+              </select>
+            </label>
+            <label>身份补充 <span class="optional">可选</span><input id="user-role-custom" placeholder="例如：表面反派，实际在保护她"></label>
+          </div>
+          <div id="real-profile-fields" class="profile-fields" hidden>
+            <div class="field-grid two">
+              <label>性别／称谓
+                <select id="subject-gender">
+                  <option value="unspecified">不指定</option>
+                  <option value="female">女</option>
+                  <option value="male">男</option>
+                  <option value="nonbinary">非二元／其他</option>
+                </select>
+              </label>
+              <label>现实关系
+                <select id="real-relationship">
+                  <option value="unsure">不确定，让应用判断</option>
+                  <option value="roommate">室友</option>
+                  <option value="friend">朋友</option>
+                  <option value="close_friend">好朋友／旧友</option>
+                  <option value="classmate">同学</option>
+                  <option value="coworker">同事</option>
+                  <option value="rival">现实中的竞争者</option>
+                </select>
+              </label>
+            </div>
+            <label>简单性格词 <span class="optional">用顿号或逗号分隔</span><input id="manual-traits" placeholder="例如：安静、谨慎、嘴硬心软、爱开玩笑"></label>
+            <label id="complex-persona-field" hidden>复杂人设
+              <textarea id="custom-persona" rows="6" placeholder="可以写：成长经历、日常习惯、说话方式、在意的人、讨厌的事、与你的过去、关系禁区、秘密和当前矛盾。"></textarea>
+            </label>
+            <label id="real-permission-card" class="check-card" hidden><input id="real-permission" type="checkbox"><span><b>已获得本人同意</b><small>不填写住址、账号、病史等敏感隐私；真人模式不会生成露骨成人内容</small></span></label>
+          </div>
+          <div class="field-grid two">
+            <label>亲密剧情强度
+              <select id="adult-content">
+                <option value="off">关闭亲密剧情</option>
+                <option value="romance">浪漫亲密（不露骨）</option>
+                <option value="purelove" selected>纯爱成人剧情（露骨）</option>
+                <option value="ntr">黄毛／NTR 成人剧情（露骨、自愿幻想）</option>
+                <option value="dark">黑暗权力幻想（露骨、预先同意）</option>
+              </select>
+            </label>
+            <label class="check-card"><input id="adult-confirmed" type="checkbox"><span><b>卡内相关人物均为 18+ 虚构成年人</b><small>露骨模式必须确认；战败、俘虏与被强迫不等于同意</small></span></label>
+          </div>
+          <p class="hint">身份决定初始好感、第一章、角色立场、专属剧情与结局；身份补充可以把任何预设改成你自己的版本。</p>
         </section>
 
-        <section class="panel-section">
+        <section id="public-source-section" class="panel-section">
           <div class="section-heading"><span>02</span><div><h2>寻找公开资料</h2><p>不需要搜索密钥</p></div></div>
           <div class="search-row">
             <input id="search-query" aria-label="搜索词" placeholder="自动使用作品名和角色名">

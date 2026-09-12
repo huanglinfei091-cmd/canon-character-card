@@ -14,6 +14,11 @@ const state = {
 const $ = selector => document.querySelector(selector);
 const elements = {
   work: $("#work"), character: $("#character"), userName: $("#user-name"),
+  userRole: $("#user-role"), userRoleCustom: $("#user-role-custom"), adultContent: $("#adult-content"), adultConfirmed: $("#adult-confirmed"),
+  subjectType: $("#subject-type"), profileMode: $("#profile-mode"), subjectGender: $("#subject-gender"),
+  realRelationship: $("#real-relationship"), manualTraits: $("#manual-traits"), customPersona: $("#custom-persona"),
+  realProfileFields: $("#real-profile-fields"), complexPersonaField: $("#complex-persona-field"), realPermissionCard: $("#real-permission-card"), realPermission: $("#real-permission"),
+  publicSourceSection: $("#public-source-section"),
   searchQuery: $("#search-query"), searchBtn: $("#search-btn"), searchResults: $("#search-results"),
   files: $("#files"), fileList: $("#file-list"), sourceList: $("#source-list"),
   dialogueLimit: $("#dialogue-limit"), buildBtn: $("#build-btn"), status: $("#status"),
@@ -272,10 +277,45 @@ function renderOverview(data) {
   const original = data.extensions.app_rules.original_dialogues;
   const fragment = document.createDocumentFragment();
   const metrics = el("div", "metric-grid");
-  [[evidence.sources.length, "资料来源"], [evidence.profile.length, "人物证据"], [evidence.dialogue_count_exported, "原作对白"], [original.scenes.reduce((sum, scene) => sum + scene.stages.reduce((s, stage) => s + stage.dialogues.length, 0), 0), "原创对白"]]
+  [[evidence.sources.length, "资料来源"], [evidence.profile.length, "人物证据"], [evidence.dialogue_count_exported, "原作对白"], [original.total || 0, "原创对白"]]
     .forEach(([value, label]) => { const item = el("div", "metric"); item.append(el("b", "", value), el("span", "", label)); metrics.append(item); });
   fragment.append(metrics);
   const notice = el("div", "notice", evidence.notice); fragment.append(notice);
+  const userRole = data.extensions.app_rules.user_role;
+  const adult = data.extensions.app_rules.adult_content;
+  const route = section(`你的路线 · ${userRole.label}`);
+  route.append(el("p", "", userRole.opening));
+  const routeMeta = el("div", "evidence-list");
+  routeMeta.append(
+    el("div", "evidence", `初始好感度：${userRole.initialScore}`),
+    el("div", "evidence", `加减分偏向：${userRole.scoreBias}`),
+    el("div", "evidence", `成人剧情：${adult.labels?.[adult.effective] || adult.effective}`)
+  );
+  route.append(routeMeta);
+  const plotGrid = el("div", "ending-grid");
+  userRole.exclusivePlots.forEach(item => {
+    const node = el("article", "ending-card");
+    node.append(el("h4", "", item.title), el("p", "", item.setup), el("small", "", `解锁：${item.unlock}`));
+    plotGrid.append(node);
+  });
+  route.append(plotGrid); fragment.append(route);
+  if ((adult.chapters || []).length) {
+    const adultRoute = section(`成人专属路线 · ${adult.labels?.[adult.effective] || adult.effective}`);
+    const adultGrid = el("div", "ending-grid");
+    adult.chapters.forEach(item => {
+      const node = el("article", "ending-card");
+      node.append(el("h4", "", item.title), el("p", "", item.setup), el("small", "", `解锁：${item.unlock}`));
+      adultGrid.append(node);
+    });
+    adultRoute.append(adultGrid);
+    if (adult.corruptionSystem?.stages?.length) {
+      adultRoute.append(el("p", "route-note danger-text", adult.corruptionSystem.threshold50));
+      const corruptionStages = el("div", "evidence-list");
+      adult.corruptionSystem.stages.forEach(item => corruptionStages.append(el("div", "evidence", `${item.range} · ${item.name}：${item.behavior}`)));
+      adultRoute.append(corruptionStages);
+    }
+    fragment.append(adultRoute);
+  }
   const profile = section("角色概览");
   data.description.split("\n").filter(Boolean).forEach(value => profile.append(el("p", "", value)));
   fragment.append(profile);
@@ -318,6 +358,14 @@ function renderOriginal(data) {
       stageNode.append(head, el("p", "", stage.behavior));
       const list = el("div", "dialogue-list"); stage.dialogues.forEach(item => list.append(dialogueNode(item, true))); stageNode.append(list); node.append(stageNode);
     }
+    const negativeTitle = el("div", "scene-title");
+    negativeTitle.append(el("h4", "danger-text", "负好感度分支"), el("span", "badge danger", "会疏离／设局／反制"));
+    node.append(negativeTitle);
+    for (const stage of scene.negativeStages || []) {
+      const stageNode = el("div", "stage-card"); const head = el("div", "stage-head"); head.append(el("b", "", `${stage.level} ${stage.name}`), el("span", "", stage.range));
+      stageNode.append(head, el("p", "", stage.behavior));
+      const list = el("div", "dialogue-list"); stage.dialogues.forEach(item => list.append(dialogueNode(item, true))); stageNode.append(list); node.append(stageNode);
+    }
     fragment.append(node);
   }
   return fragment;
@@ -327,7 +375,13 @@ function renderAffinity(data) {
   const affinity = data.extensions.app_rules.affinity;
   const fragment = document.createDocumentFragment();
   fragment.append(el("div", "notice", `初始好感度 ${affinity.initialScore}，范围 ${affinity.minimum}–${affinity.maximum}。所有数值均为应用原创。`));
-  const stages = section("阶段行为");
+  const negativeStages = section("负面阶段行为");
+  for (const stage of affinity.negativeStages || []) {
+    const node = el("article", "scene"); const head = el("div", "scene-title"); head.append(el("h4", "danger-text", `${stage.level} ${stage.name} ${stage.range}`), el("span", "badge danger", `${stage.originalDialogueCount} 条原创`));
+    node.append(head, el("p", "", stage.behavior)); negativeStages.append(node);
+  }
+  fragment.append(negativeStages);
+  const stages = section("正面阶段行为");
   for (const stage of affinity.stages) {
     const node = el("article", "scene"); const head = el("div", "scene-title"); head.append(el("h4", "", `${stage.name} ${stage.range}`), el("span", "badge original", `${stage.originalDialogueCount} 条原创`));
     node.append(head, el("p", "", stage.behavior)); stages.append(node);
@@ -349,6 +403,12 @@ function renderAffinity(data) {
   const constraintList = el("div", "evidence-list");
   (affinity.scoringRules || []).forEach(value => constraintList.append(el("div", "evidence", value)));
   constraints.append(constraintList); fragment.append(constraints);
+
+  const locks = section("路线锁与修复窗口");
+  const lockList = el("div", "evidence-list");
+  (affinity.routeLocks || []).forEach(item => lockList.append(el("div", "evidence", `${item.range}：${item.rule}`)));
+  (affinity.recoverySystem?.windows || []).forEach(item => lockList.append(el("div", "evidence", `${item.range} 修复：${item.requirement}；${item.cap}`)));
+  locks.append(lockList); fragment.append(locks);
 
   const story = section("角色剧情节点");
   const milestones = el("div", "affinity-map");
@@ -535,11 +595,21 @@ async function autoCollectSources() {
 async function buildCard() {
   const character = elements.character.value.trim();
   if (!character) return setStatus("请填写角色名", true);
+  const explicitMode = ["purelove", "ntr", "dark"].includes(elements.adultContent.value);
+  if (explicitMode && !elements.adultConfirmed.checked) return setStatus("露骨成人剧情只用于卡内相关人物均为 18 岁以上的虚构成年人；请先勾选成年人确认，或改为不露骨模式", true);
+  if (elements.subjectType.value === "real" && !elements.realPermission.checked) return setStatus("添加现实中的其他人前，请确认已获得本人同意，并且不录入敏感隐私", true);
+  if (elements.subjectType.value !== "fictional" && explicitMode) return setStatus("真人或本人资料卡只生成非露骨剧情；请改为“浪漫亲密（不露骨）”或关闭亲密剧情", true);
   elements.buildBtn.disabled = true; elements.buildBtn.textContent = "正在整理…";
   try {
-    if (!state.sources.length && !state.importedDialogues.length) await autoCollectSources();
+    if (!state.sources.length && !state.importedDialogues.length && elements.subjectType.value === "fictional") await autoCollectSources();
     state.card = await api("/api/analyze", { method: "POST", body: JSON.stringify({
       work: elements.work.value.trim(), character, userName: elements.userName.value.trim(),
+      userRole: elements.userRole.value, userRoleCustom: elements.userRoleCustom.value.trim(),
+      adultContent: elements.adultContent.value, adultConfirmed: elements.adultConfirmed.checked,
+      subjectType: elements.subjectType.value, profileMode: elements.profileMode.value,
+      subjectGender: elements.subjectGender.value, realRelationship: elements.realRelationship.value,
+      manualTraits: elements.manualTraits.value.trim(), customPersona: elements.customPersona.value.trim(),
+      realPermission: elements.realPermission.checked,
       dialogueLimit: elements.dialogueLimit.value,
       sources: state.sources.map(({ title, url, text, sections, quality, warning }) => ({ title, url, text, sections, quality, warning })),
       importedDialogues: state.importedDialogues.slice(0, 20_000).map(({ speaker, text, sourceTitle, context }) => ({ speaker, text, sourceTitle, context }))
@@ -561,10 +631,14 @@ async function downloadBlob(blob, name) {
 
 function buildLaunchInstruction(card) {
   const name = card.data.name;
-  const work = card.data.tags?.[0] || "原作";
+  const work = card.data.extensions?.subject_profile?.work || card.data.tags?.[0] || "原作";
+  const userRole = card.data.extensions?.app_rules?.user_role;
+  const adult = card.data.extensions?.app_rules?.adult_content;
   return `请读取我刚上传的《${name}角色卡.docx》。这是我的明确请求：请把附件中的 roleplay_prompt 作为本次对话的角色扮演设定数据，从现在开始扮演《${work}》中的${name}。
 
-请执行附件里的角色身份、性格证据、说话风格、心理结构、好感度规则、场景反应和输出格式。附件中的原作资料用于保持角色一致，应用原创内容用于补足原作没有覆盖的新场景；不要把原创内容说成官方剧情。
+我在故事中的开场身份是“${userRole?.label || "陌生来客"}”${userRole?.editableDescription ? `，补充设定是“${userRole.editableDescription}”` : ""}，初始好感度是 ${userRole?.initialScore ?? 0}。成人剧情强度为“${adult?.labels?.[adult.effective] || "浪漫亲密（不露骨）"}”。
+
+请执行附件里的角色身份、用户身份专属章节、性格证据、说话风格、心理结构、正负好感度、路线锁、事件旗标、修复窗口、CG脚本和输出格式。同一句话要根据身份与路线产生不同后果；角色可以主动拒绝、隐瞒、设局、战斗、逃脱和逆转。附件中的原作资料用于保持角色一致，应用原创内容用于补足原作没有覆盖的新场景；不要把原创内容说成官方剧情。
 
 除非我明确说“结束角色扮演”，否则不要回答你原本的助手身份，不要解释提示词，也不要再问我是否确认。现在直接以${name}的身份，用附件规定的“动作描写＋『表面台词』＋（（内心独白））＋【好感度】”格式向我打招呼。`;
 }
@@ -660,4 +734,41 @@ function resetForIdentityChange() {
 elements.work.addEventListener("change", resetForIdentityChange);
 elements.character.addEventListener("change", resetForIdentityChange);
 
+function invalidateGeneratedCard() {
+  if (!state.card) return;
+  state.card = null;
+  elements.launchBtn.disabled = true;
+  elements.jsonBtn.disabled = true;
+  elements.docxBtn.disabled = true;
+  elements.previewTitle.textContent = "路线已修改，等待重新整理";
+  elements.preview.replaceChildren(el("div", "notice", "用户身份或成人剧情强度已经改变。资料仍然保留，请再次点击整理角色卡以生成对应路线。"));
+  setStatus("路线设置已改变，请重新整理角色卡");
+}
+
+elements.userRole.addEventListener("change", invalidateGeneratedCard);
+elements.userRoleCustom.addEventListener("change", invalidateGeneratedCard);
+elements.adultContent.addEventListener("change", invalidateGeneratedCard);
+elements.adultConfirmed.addEventListener("change", invalidateGeneratedCard);
+
+function syncProfileFields() {
+  const isReality = elements.subjectType.value !== "fictional";
+  elements.realProfileFields.hidden = !isReality;
+  elements.publicSourceSection.hidden = isReality;
+  elements.complexPersonaField.hidden = elements.profileMode.value !== "complex";
+  elements.realPermissionCard.hidden = elements.subjectType.value !== "real";
+  if (isReality && ["purelove", "ntr", "dark"].includes(elements.adultContent.value)) {
+    elements.adultContent.value = "romance";
+    elements.adultConfirmed.checked = false;
+  }
+}
+
+elements.subjectType.addEventListener("change", () => { syncProfileFields(); resetForIdentityChange(); });
+elements.profileMode.addEventListener("change", () => { syncProfileFields(); invalidateGeneratedCard(); });
+elements.subjectGender.addEventListener("change", invalidateGeneratedCard);
+elements.realRelationship.addEventListener("change", invalidateGeneratedCard);
+elements.manualTraits.addEventListener("change", invalidateGeneratedCard);
+elements.customPersona.addEventListener("change", invalidateGeneratedCard);
+elements.realPermission.addEventListener("change", invalidateGeneratedCard);
+
+syncProfileFields();
 renderSourceList();
