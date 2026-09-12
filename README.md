@@ -21,7 +21,7 @@
 
 ### Windows
 
-1. 从 [Releases](../../releases) 下载 `CanonCharacterCard-Windows-x64-v1.0.0.zip`。
+1. 从 [Releases](https://github.com/huanglinfei091-cmd/canon-character-card/releases) 下载 `CanonCharacterCard-Windows-x64-v1.0.0.zip`。
 2. 完整解压 ZIP，不要直接在压缩包内运行。
 3. 双击 `原作角色卡整理器.exe`。
 
@@ -29,7 +29,7 @@
 
 ### Android
 
-1. 从 [Releases](../../releases) 下载 `CanonCharacterCard-Android-v1.0.0.apk`。
+1. 从 [Releases](https://github.com/huanglinfei091-cmd/canon-character-card/releases) 下载 `CanonCharacterCard-Android-v1.0.0.apk`。
 2. 在手机上打开 APK，按 Android 提示允许此次安装。
 3. 安装后打开“原作角色卡整理器”。导出时会调用系统分享/保存面板。
 
