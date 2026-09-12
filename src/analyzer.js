@@ -926,7 +926,7 @@ function buildAdultSettings(requestedLevel, adultConfirmed, subjectType = "ficti
       initialCustomized: ["purelove", "ntr", "dark"].includes(effective) && corruptionStart.customized,
       minimum: 0,
       maximum: 100,
-      meaning: "0–49 显示为堕落值，表示对禁忌与背德幻想的动摇；50–100 进入调教路线，表示对预先协商的权力扮演、服从与反转的探索深度。它不是好感度、道德评判或性同意。",
+      meaning: "0–49 显示为堕落值，表示对禁忌与背德幻想的动摇；50–100 进入调教路线，表示逐渐增强的身体吸引、性欲冲突，以及对预先协商的权力扮演、服从与反转的探索深度。它不是爱情、原谅、道德评判或性同意。",
       stages: [
         { range: "0至9", name: "界外", behavior: "不主动进入该主题，明确拒绝越界试探。" },
         { range: "10至29", name: "好奇", behavior: "承认好奇但保持距离，只讨论边界与假设。" },
@@ -1037,7 +1037,7 @@ function buildInitialRouteState({ affinity, corruption, betrayal, character, cus
   let endingCandidates = ["关系推进", "保持现状", "关系降级", "隐藏反转"];
   if (betrayal >= 90 && affinity <= -50 && corruption >= 90) {
     title = "欲望尽头的清算";
-    centralConflict = `${character}对用户的敌意与背叛创伤都已到达极限，却仍承受最高等级的身体欲望。角色会把接近视为风险、诱饵或最后一次夺回主动权，不会因欲望突然原谅或爱上用户。`;
+    centralConflict = `${character}对用户的敌意与背叛创伤都已到达极限，却仍承受最高等级的身体吸引与性欲冲突。角色会把接近视为风险、诱饵或最后一次夺回主动权，不会因欲望突然原谅或爱上用户。`;
     endingCandidates = ["拒绝诱惑并完成清算", "带条件的危险停火", "明确同意后的强势关系博弈", "隐藏反转·借欲望设局"];
   } else if (betrayal >= 90 && affinity >= 80 && corruption >= 90) {
     title = "爱欲与背叛的废墟";
@@ -1098,7 +1098,7 @@ function buildInitialRouteState({ affinity, corruption, betrayal, character, cus
     interpretation: centralConflict,
     behaviorRules: [
       `好感层级“${a.name}”决定${character}对用户的基本距离、信任与敌意。`,
-      `堕落／调教层级“${c.name}”决定欲望、禁忌好奇和亲密主题的主动程度。`,
+      `堕落／调教层级“${c.name}”决定身体吸引、性欲冲突、禁忌好奇和亲密主题的主动程度；它独立于爱情、原谅与性同意。`,
       `背叛层级“${b.name}”决定核验、隐瞒、对质、修复、反制与结局风险。`,
       "同一个用户选择必须分别计算三项变化，允许一项上升而另一项下降。"
     ],

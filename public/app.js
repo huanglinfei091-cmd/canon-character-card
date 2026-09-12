@@ -338,7 +338,7 @@ function renderOverview(data) {
   const routeMeta = el("div", "evidence-list");
   routeMeta.append(
     el("div", "evidence", `初始好感度：${userRole.initialScore}`),
-    el("div", "evidence", `初始堕落／调教值：${adult.corruptionSystem?.initial ?? 0}`),
+    el("div", "evidence", `初始堕落／欲望／调教值：${adult.corruptionSystem?.initial ?? 0}`),
     el("div", "evidence", `初始背叛值：${betrayal?.initial ?? 0}`),
     el("div", "evidence", `加减分偏向：${userRole.scoreBias}`),
     el("div", "evidence", `成人剧情：${adult.labels?.[adult.effective] || adult.effective}${adult.lockedByCanon ? "（原作锁定）" : ""}`)

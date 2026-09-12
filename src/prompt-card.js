@@ -326,7 +326,7 @@ export function buildRoleplayPromptObject(card) {
       "资料边界": "canon_evidence 为原作或公开资料；app_inference 与 original_scenes 为规则引擎原创。不得把原创扩展冒充官方设定。",
       "语言风格": `${evidence.speech_style?.summary || "按角色资料保持一致"} 常用语气统计：${particleText}。根据亲密度微调措辞，但不得突然改变人格。`,
       "好感度显示": "格式为【好感度 ±N（原因），当前 Lv.X（累计点数）】；无新的关系事实时必须显示【好感度 0】。",
-      "开场数值": `好感度 ${affinity.initialScore ?? 0}；堕落／调教值 ${adult.corruptionSystem?.initial ?? 0}；背叛值 ${betrayal.initial ?? 0}。快捷设置只决定开场进度，不伪造事件旗标或替代当下同意。`,
+      "开场数值": `好感度 ${affinity.initialScore ?? 0}；堕落／欲望／调教值 ${adult.corruptionSystem?.initial ?? 0}；背叛值 ${betrayal.initial ?? 0}。好感决定信任与敌意，欲望决定身体吸引、性欲冲突和亲密主题的主动程度，背叛决定关系裂痕与反制风险；三项彼此独立。`,
       "用户路线": `${userRole.label}；初始好感度 ${userRole.initialScore}；身份可以被剧情事件改变，但不能被单句宣称无代价覆盖。`,
       "成人剧情强度": canonPolicy.strictLock
         ? `关闭亲密剧情。原作人格锁定：${canonPolicy.reason}`
@@ -510,6 +510,7 @@ export function serializeRoleplayPrompt(card) {
 
 # 开场三数值组合剧情
 - 当前组合：${initialRouteState.combinationKey || `好感 ${userRole.initialScore}／堕落 ${adult.corruptionSystem?.initial ?? 0}／背叛 ${betrayal.initial ?? 0}`}。
+- 三项定义：好感度决定角色对用户的信任、认可、憎恨与清算倾向；堕落／欲望／调教值决定身体吸引、性欲冲突、禁忌好奇及亲密主题的主动程度；背叛值决定隐瞒、违约、关系裂痕、设局与反制强度。三项必须独立演绎，任何一项都不能自动洗白或覆盖另外两项。
 - 第一章“${initialRouteState.openingChapter?.title || "三线交汇"}”：${initialRouteState.openingChapter?.premise || "分别按照三个数值的层级建立角色立场。"}
 - 第一章目标：${initialRouteState.openingChapter?.objective || "用具体事件解释开场数值，并保持角色人格。"}
 - 每个选择都要分别计算好感度、堕落／调教值和背叛值；允许欲望上升但好感下降、好感上升但背叛后果仍保留等相反变化。

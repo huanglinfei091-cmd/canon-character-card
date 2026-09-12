@@ -248,6 +248,8 @@ test("supports one-click opening values for affinity corruption and betrayal", (
   assert.equal(conflict.preset, "extreme-conflict");
   assert.match(conflict.interpretation, /敌意与背叛创伤都已到达极限/);
   assert.equal(conflict.openingChapter.title, "欲望尽头的清算");
+  assert.match(conflict.openingChapter.premise, /身体吸引与性欲冲突/);
+  assert.match(conflict.behaviorRules.join("\n"), /独立于爱情、原谅与性同意/);
   assert.equal(conflict.openingChapter.requiredChoices.length, 4);
   assert.ok(conflict.endingCandidates.some(item => /设局/.test(item)));
   assert.match(conflict.consentRule, /不能替代当下明确同意/);
@@ -255,7 +257,9 @@ test("supports one-click opening values for affinity corruption and betrayal", (
   assert.match(conflict.memorySeed, /不得把双方写成初次见面/);
   assert.match(conflictCard.data.extensions.app_rules.user_role.opening, /三数值组合优先/);
   assert.match(conflictCard.data.first_mes, /已经认识你/);
-  assert.match(serializeRoleplayPrompt(conflictCard), /不得把 -100 写成 Lv\.0/);
+  const conflictPrompt = serializeRoleplayPrompt(conflictCard);
+  assert.match(conflictPrompt, /不得把 -100 写成 Lv\.0/);
+  assert.match(conflictPrompt, /堕落／欲望／调教值决定身体吸引、性欲冲突/);
 
   const lovedButBetrayed = analyzeCharacter({
     work: "鸣潮", character: "秧秧", sources: [source], canonMode: "canon-if",
