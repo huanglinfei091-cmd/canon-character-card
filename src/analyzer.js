@@ -241,11 +241,11 @@ function buildOriginalDialogues({ character, work, traits, motifs, speechStyle, 
   const suffix = lively ? particle : "";
 
   const stages = [
-    { level: "Lv.0-1", range: "0–199", name: "初识", address: addressee, distance: "礼貌观察并保留边界", trust: "不主动透露私人情绪" },
-    { level: "Lv.2", range: "200–299", name: "眼熟", address: addressee, distance: "愿意一起行动并回应日常话题", trust: "会记住对方的小习惯" },
-    { level: "Lv.3", range: "300–399", name: "信任", address: addressee, distance: "主动协助并分享判断", trust: "允许对方看见犹豫和疲惫" },
-    { level: "Lv.4", range: "400–499", name: "依赖", address: addressee, distance: "关心会先于客套", trust: "会直接表达担忧与依赖" },
-    { level: "Lv.5", range: "500+", name: "全部", address: addressee, distance: "稳定维护彼此选择和边界", trust: "愿意坦白最深的顾虑与承诺" }
+    { level: "Lv.0", range: "0–9", name: "观察", address: addressee, distance: "礼貌观察并保留边界", trust: "不主动透露私人情绪" },
+    { level: "Lv.1", range: "10–29", name: "初识", address: addressee, distance: "愿意一起行动并回应日常话题", trust: "会记住对方的小习惯" },
+    { level: "Lv.2", range: "30–49", name: "熟悉", address: addressee, distance: "主动协助并分享判断", trust: "允许对方看见犹豫和疲惫" },
+    { level: "Lv.3", range: "50–79", name: "信任", address: addressee, distance: "关心会先于客套", trust: "会直接表达担忧与依赖" },
+    { level: "Lv.4", range: "80–99", name: "羁绊", address: addressee, distance: "稳定维护彼此选择和边界", trust: "愿意坦白最深的顾虑与承诺" }
   ];
 
   const reactions = {
@@ -406,35 +406,77 @@ function buildOriginalDialogues({ character, work, traits, motifs, speechStyle, 
   };
 }
 
-function buildAffinity(dialoguesByScene, original) {
+function buildAffinity(dialoguesByScene, original, character) {
   const select = (...names) => names.flatMap(name => dialoguesByScene[name] || []).slice(0, 8);
+  const motifs = original.motifs?.length ? original.motifs : ["过往", "承诺", "选择", "未来"];
+  const motif = index => motifs[index % motifs.length];
   const stages = [
-    { level: "Lv.0-1", range: "0–199", name: "初识", behavior: "礼貌而克制，保持可见边界；会观察言行是否一致，不因一次寒暄迅速亲近。", dialoguePool: select("初次见面", "未分类原作对白") },
-    { level: "Lv.2", range: "200–299", name: "眼熟", behavior: "记得说话习惯和小细节，愿意延长日常交流，但仍不会主动暴露最脆弱的部分。", dialoguePool: select("闲聊与日常", "天气与旅途") },
-    { level: "Lv.3", range: "300–399", name: "信任", behavior: "会主动分享判断和重要经历，在危机中把一部分后背交给对方。", dialoguePool: select("信任与亲近", "战斗与危机") },
-    { level: "Lv.4", range: "400–499", name: "依赖", behavior: "关心会先于客套，能直接说出担忧；失约和隐瞒造成的伤害也会明显加重。", dialoguePool: select("关心与照顾", "失落与脆弱") },
-    { level: "Lv.5", range: "500+", name: "全部", behavior: "稳定表达信赖、思念和保护倾向，愿意坦白最深的恐惧，同时仍尊重彼此选择。", dialoguePool: select("信任与亲近", "关心与照顾") }
+    { level: "Lv.0", range: "0–9", name: "观察", behavior: "礼貌而克制，保持可见边界；会观察言行是否一致，普通寒暄默认不加分。", dialoguePool: select("初次见面", "未分类原作对白") },
+    { level: "Lv.1", range: "10–29", name: "初识", behavior: "记得说话习惯和小细节，愿意延长日常交流，但仍不会主动暴露最脆弱的部分。", dialoguePool: select("闲聊与日常", "天气与旅途") },
+    { level: "Lv.2", range: "30–49", name: "熟悉", behavior: "会主动分享判断，在事关重要目标时允许对方参与，但仍会保留退路。", dialoguePool: select("信任与亲近", "战斗与危机") },
+    { level: "Lv.3", range: "50–79", name: "信任", behavior: "关心会先于客套，能直接说出担忧；失约和隐瞒造成的伤害也会明显加重。", dialoguePool: select("关心与照顾", "失落与脆弱") },
+    { level: "Lv.4", range: "80–99", name: "羁绊", behavior: "稳定表达信赖、思念和保护倾向，愿意坦白最深的恐惧，同时仍尊重彼此选择。", dialoguePool: select("信任与亲近", "关心与照顾") }
   ];
   for (const stage of stages) {
     stage.originalDialogueCount = original.scenes.reduce((sum, scene) => sum + (scene.stages.find(item => item.level === stage.level)?.dialogues.length || 0), 0);
   }
   return {
     initialScore: 0,
-    minimum: 0,
-    maximum: 599,
+    minimum: -100,
+    maximum: 100,
     decay: "长期无互动不自动下降；严重违背角色原则时按事件扣分。",
     events: [
-      { event: "尊重角色选择或边界", change: 3 },
-      { event: "兑现重要承诺", change: 8 },
-      { event: "在危机中保护彼此", change: 12 },
-      { event: "认真倾听并回应脆弱", change: 6 },
-      { event: "普通愉快交流", change: 1 },
-      { event: "敷衍或无视明确感受", change: -3 },
-      { event: "违背承诺", change: -10 },
-      { event: "伤害重要之人或践踏核心原则", change: -20 },
-      { event: "强迫亲密或越过明确边界", change: -15 }
+      { event: "普通寒暄、重复夸赞或无实际内容的示好", change: 0, reason: "不能靠刷对话升级" },
+      { event: "坦白目的、提供有效情报或完成小事", change: 1 },
+      { event: "实际分担风险或在细节上照顾角色", change: 2 },
+      { event: "尊重角色选择、边界或在压力下仍保持诚实", change: 3 },
+      { event: "兑现重要承诺或成功修复一次真实冲突", change: 5 },
+      { event: "在危机中守护重要之人并承担后果", change: 8 },
+      { event: "隐瞒小事、故意试探或轻度敷衍", change: -1 },
+      { event: "利用信任、持续回避关键问题或出卖小利益", change: -3 },
+      { event: "强迫亲密、羞辱角色或越过明确边界", change: -5 },
+      { event: "违背重要承诺、恶意欺骗或在危机中抛弃同伴", change: -8 },
+      { event: "伤害角色守护的人、践踏核心原则或彻底背叛", change: -10 }
     ],
-    stages
+    scoringRules: [
+      "每轮先判断用户行为是否产生了新的关系事实；没有则必须记为 0。",
+      "好感度必须有增有减，不得为了讨好用户只加分。",
+      "同一行为连续重复时收益递减为 0；负面行为重复则可累积。",
+      "高好感度时的欺骗、背叛和失约，扣分可在基础值上再加 2–5 点。",
+      "道歉本身不加分；只有承认、说明、补偿并经过后续行动才算修复。",
+      "分数每轮最多 +8、最少 -10，并限制在 -100 至 100。"
+    ],
+    stages,
+    storyUnlocks: [
+      { score: 10, id: "STORY-10", title: `关于「${motif(0)}」的试探`, rule: "第一次跨过 10 点时只触发一次，让用户面对一个能验证可靠性的小任务。" },
+      { score: 30, id: "STORY-30", title: `与${character}共担「${motif(1)}」`, rule: "第一次跨过 30 点时触发并肩试炼，选择会记录为结局旗标。" },
+      { score: 50, id: "STORY-50", title: `「${motif(2)}」背后的真相`, rule: "第一次跨过 50 点时触发私密剧情，角色会坦露一部分恐惧或过去。" },
+      { score: 80, id: "STORY-80", title: `在「${motif(3)}」之前的选择`, rule: "第一次跨过 80 点时触发命运选择，决定 100 点时的结局候选。" }
+    ],
+    badEndingRoute: {
+      unlock: "好感度低于 0 时开启坏结局路线；负分不等于立即强制结束，只在冲突高潮或用户继续做出破坏性选择时结算。",
+      endings: [
+        { id: "BE-1", range: "-1至-19", title: "分道扬镳", hidden: false, condition: "信任产生裂缝且一次修复机会被拒绝。", result: `${character}恢复对陌生人的距离，在当前目标完成后离开。` },
+        { id: "BE-2", range: "-20至-49", title: "信任尽失", hidden: false, condition: "重要承诺被违背，且用户拒绝承担后果。", result: `${character}不再分享情报和弱点，关系转为戒备或利益交换。` },
+        { id: "BE-3", range: "-50至-79", title: "反目成仇", hidden: false, condition: "用户伤害角色守护之人，或连续利用角色的信任。", result: `${character}将用户视为必须阻止的对象，原有情感反而加深冲突。` },
+        { id: "BE-HIDDEN", range: "-80至-100", title: "？？？", hidden: true, condition: `破坏四个剧情节点的关键承诺，并利用「${motif(0)}」对${character}造成无法撤回的伤害。`, result: "不在提前预览中公开；达成条件时才由角色化剧情揭示。" }
+      ]
+    },
+    goodEndingRoute: {
+      unlock: "好感度到达 100 时解锁好结局。不并列输出所有结局，而是根据四个剧情节点、承诺、冲突修复和关系倾向选择最匹配的一个。",
+      normalEndings: [
+        { id: "GE-1", title: "与君同行", condition: "主要选择是并肩承担风险与继续旅途。", result: `${character}与用户把对方正式写入未来计划。` },
+        { id: "GE-2", title: "守望归途", condition: "主要选择是给予彼此自由，仍稳定守望与回归。", result: `${character}不以占有证明关系，却始终为用户保留归途。` },
+        { id: "GE-3", title: "共赴明日", condition: "主要选择是共同完成角色使命，并创造两人都认可的新目标。", result: `${character}与用户结束旧章，主动选择同一个新起点。` }
+      ],
+      hiddenEndings: [
+        { id: "GE-H1", title: "？？？", clue: `从未背弃承诺，并理解「${motif(0)}」对${character}的真正意义。` },
+        { id: "GE-H2", title: "？？？", clue: "在无人会知道的情况下，仍选择保护角色最重视的人。" },
+        { id: "GE-H3", title: "？？？", clue: "获得离开或获利的机会后，主动回来并承担后果。" },
+        { id: "GE-H4", title: "？？？", clue: "在不追求恋爱占有的路线中达到 100，完成最高层次的理解与同伴结局。" },
+        { id: "GE-H5", title: "？？？", clue: "获得 STORY-10/30/50/80 四枚剧情印记，修复过一次足以降级的冲突，且最终从未要求角色背叛核心原则。" }
+      ]
+    }
   };
 }
 
@@ -466,7 +508,7 @@ export function analyzeCharacter(input) {
   const motifs = buildMotifs(character, sources);
   const speechStyle = buildSpeechStyle(dialogues);
   const original = buildOriginalDialogues({ character, work, traits, motifs, speechStyle, userName: input.userName });
-  const affinity = buildAffinity(dialogueScenes, original);
+  const affinity = buildAffinity(dialogueScenes, original, character);
   const evidenceNote = "性格词、关系和说话风格均来自来源文本或对白统计；好感度数值、行为阶段和新场景对白由应用规则原创，不属于游戏或小说官方内容。";
 
   const description = profile.map(item => item.text).slice(0, 8).join("\n") || `${character}的资料需要从来源中继续补充。`;

@@ -334,8 +334,52 @@ function renderAffinity(data) {
   }
   fragment.append(stages);
   const events = section("事件增减"); const list = el("div", "evidence-list");
-  affinity.events.forEach(item => { const node = el("div", "compact-item"); node.append(el("strong", "", item.event), el("span", item.change > 0 ? "badge" : "badge original", item.change > 0 ? `+${item.change}` : item.change)); list.append(node); });
+  affinity.events.forEach(item => {
+    const node = el("div", "compact-item");
+    const copy = el("div");
+    copy.append(el("strong", "", item.event));
+    if (item.reason) copy.append(el("small", "", item.reason));
+    const change = item.change > 0 ? `+${item.change}` : `${item.change}`;
+    node.append(copy, el("span", item.change > 0 ? "badge" : item.change < 0 ? "badge danger" : "badge neutral", change));
+    list.append(node);
+  });
   events.append(list); fragment.append(events);
+
+  const constraints = section("计分约束");
+  const constraintList = el("div", "evidence-list");
+  (affinity.scoringRules || []).forEach(value => constraintList.append(el("div", "evidence", value)));
+  constraints.append(constraintList); fragment.append(constraints);
+
+  const story = section("角色剧情节点");
+  const milestones = el("div", "affinity-map");
+  (affinity.storyUnlocks || []).forEach(item => {
+    const node = el("article", "milestone");
+    node.append(el("span", "milestone-score", `${item.score}`), el("h4", "", item.title), el("p", "", item.rule));
+    milestones.append(node);
+  });
+  story.append(milestones); fragment.append(story);
+
+  const buildEndingCard = (item, kind, badgeText) => {
+    const node = el("article", `ending-card ${kind}${item.hidden ? " hidden" : ""}`);
+    const head = el("div", "scene-title");
+    head.append(el("h4", "", item.title), el("span", `badge ${kind === "bad" ? "danger" : ""}`, badgeText));
+    node.append(head, el("p", "", item.condition || item.clue || ""));
+    if (item.result) node.append(el("small", "", item.result));
+    return node;
+  };
+
+  const bad = section("坏结局路线 · 4 个（含 1 个隐藏）");
+  bad.append(el("p", "route-note danger-text", affinity.badEndingRoute?.unlock || ""));
+  const badGrid = el("div", "ending-grid");
+  (affinity.badEndingRoute?.endings || []).forEach(item => badGrid.append(buildEndingCard(item, "bad", item.hidden ? "隐藏" : item.range)));
+  bad.append(badGrid); fragment.append(bad);
+
+  const good = section("好结局路线 · 3 个普通 + 5 个隐藏");
+  good.append(el("p", "route-note", affinity.goodEndingRoute?.unlock || ""));
+  const goodGrid = el("div", "ending-grid");
+  (affinity.goodEndingRoute?.normalEndings || []).forEach(item => goodGrid.append(buildEndingCard(item, "good", "100 点")));
+  (affinity.goodEndingRoute?.hiddenEndings || []).forEach(item => goodGrid.append(buildEndingCard(item, "good", "隐藏")));
+  good.append(goodGrid); fragment.append(good);
   return fragment;
 }
 

@@ -12,8 +12,9 @@
 1. 输入作品名和角色名，从公开网页搜索角色档案、经历、性格、人物关系和对白。
 2. 导入自己合法持有的 JSON、JSONL、CSV、TXT 或 Markdown 文件。
 3. 把原作事实与应用扩写内容分区保存，避免把原创内容冒充官方设定。
-4. 根据角色经历、母题和语料统计，用固定规则生成五级好感度、12 类场景反应、动作、内心独白和大量新对白。
-5. 导出 Character Card V3 JSON、Word DOCX 和启动指令 TXT。
+4. 根据角色经历、母题和语料统计，用固定规则生成 -100至100 的双向好感度、12 类场景反应、动作、内心独白和大量新对白。
+5. 好感度低于 0 开启 4 个坏结局（含 1 个隐藏）；10/30/50/80 解锁角色剧情；100 点从 3 个普通和 5 个隐藏好结局中判定最匹配的一个。
+6. 导出 Character Card V3 JSON、Word DOCX 和启动指令 TXT。
 
 > 应用不会自动变成角色。将导出的 Word/JSON 上传到你要使用的 AI，再发送应用生成的“启动指令”，AI 才会按该角色卡扮演。
 
@@ -21,7 +22,7 @@
 
 ### Windows
 
-1. 从 [Releases](https://github.com/huanglinfei091-cmd/canon-character-card/releases) 下载 `CanonCharacterCard-Windows-x64-v1.0.0.zip`。
+1. 从 [Releases](https://github.com/huanglinfei091-cmd/canon-character-card/releases) 下载最新的 `CanonCharacterCard-Windows-x64-v1.1.0.zip`。
 2. 完整解压 ZIP，不要直接在压缩包内运行。
 3. 双击 `原作角色卡整理器.exe`。
 
@@ -29,7 +30,7 @@
 
 ### Android
 
-1. 从 [Releases](https://github.com/huanglinfei091-cmd/canon-character-card/releases) 下载 `CanonCharacterCard-Android-v1.0.0.apk`。
+1. 从 [Releases](https://github.com/huanglinfei091-cmd/canon-character-card/releases) 下载最新的 `CanonCharacterCard-Android-v1.1.0.apk`。
 2. 在手机上打开 APK，按 Android 提示允许此次安装。
 3. 安装后打开“原作角色卡整理器”。导出时会调用系统分享/保存面板。
 
