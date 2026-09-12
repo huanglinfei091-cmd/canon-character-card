@@ -193,6 +193,31 @@ test("applies persona-first relationship gating to every character", () => {
   assert.match(bondedIf.data.extensions.app_rules.user_role.label, /IF 非原作路线/);
 });
 
+test("builds an explicit NTR participant map instead of an ambiguous route", () => {
+  const thirdParty = analyzeCharacter({
+    work: "鸣潮", character: "秧秧", sources: [source], userRole: "villain", userName: "旅行者",
+    canonMode: "canon-if", adultContent: "ntr", adultConfirmed: true,
+    ntrPerspective: "auto", ntrOriginalPartner: "漂泊者"
+  });
+  const adult = thirdParty.data.extensions.app_rules.adult_content;
+  assert.equal(adult.effective, "ntr");
+  assert.equal(adult.ntrScenario.resolvedPerspective, "user_third_party");
+  assert.equal(adult.ntrScenario.originalPartner, "漂泊者");
+  assert.equal(adult.ntrScenario.thirdParty, "旅行者");
+  assert.equal(adult.chapters.length, 5);
+  assert.match(adult.chapters[0].setup, /原关系真实状态|关系必须先由资料与开场事件建立/);
+  assert.match(serializeRoleplayPrompt(thirdParty), /NTR 视角：黄毛／第三者视角/);
+
+  const originalPartner = analyzeCharacter({
+    work: "鸣潮", character: "秧秧", sources: [source], userRole: "romance", userName: "漂泊者",
+    canonMode: "canon-if", adultContent: "ntr", adultConfirmed: true,
+    ntrPerspective: "user_original_partner", ntrThirdParty: "第三者甲"
+  }).data.extensions.app_rules.adult_content.ntrScenario;
+  assert.equal(originalPartner.resolvedPerspective, "user_original_partner");
+  assert.equal(originalPartner.originalPartner, "漂泊者");
+  assert.equal(originalPartner.thirdParty, "第三者甲");
+});
+
 test("rejects empty source set", () => {
   assert.throws(() => analyzeCharacter({ character: "秧秧" }), /至少添加一个/);
 });

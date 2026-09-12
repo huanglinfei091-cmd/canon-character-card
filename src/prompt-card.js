@@ -393,6 +393,7 @@ export function buildRoleplayPromptObject(card) {
         "成年人确认": adult.adultConfirmed === true,
         "规则": adult.rules || [],
         "当前成人路线规则": adult.routeRules || [],
+        "NTR参与者与视角": adult.ntrScenario || { "启用": false },
         "成人专属章节": adult.chapters || [],
         "成人路线结局": adult.endings || [],
         "成人事件CG": adult.eventCGs || [],
@@ -458,10 +459,13 @@ export function serializeRoleplayPrompt(card) {
   const adult = card.data.extensions?.app_rules?.adult_content || { effective: "romance", adultConfirmed: false };
   const canonPolicy = card.data.extensions?.app_rules?.canon_policy || { modeLabel: "原作严格", strictLock: false };
   const adultEnabled = ["purelove", "ntr", "dark"].includes(adult.effective);
+  const ntrEngineBlock = adult.effective === "ntr" && adult.ntrScenario
+    ? `\n- NTR 视角：${adult.ntrScenario.label}；故事目标：${adult.ntrScenario.target}；原关系对象：${adult.ntrScenario.originalPartner}；第三者：${adult.ntrScenario.thirdParty}。\n- NTR 推进顺序：${adult.ntrScenario.progression.join(" → ")}。\n- ${adult.ntrScenario.outcomeRule}`
+    : "";
   const adultEngineBlock = canonPolicy.relationshipLock
     ? `- 当前强度：关闭亲密剧情。\n- 原作严格锁定：${canonPolicy.reason || "该角色的核心人格与恋爱、成人亲密路线不兼容。"}\n- 不创建堕落值、调教值、成人事件、恋爱结局或亲密结局；用户选择不能解除此锁定。`
     : adultEnabled
-      ? `- 当前强度：${adult.labels?.[adult.effective] || adult.effective}。\n- 只有卡内双方均明确为 18 岁以上虚构成年人、当前能自由选择且双方明确自愿时，才允许进入露骨亲密场景；同意可随时撤回。\n- 战败、负伤、俘虏、囚困、审问、控制和反制可以写得黑暗激烈，但这些状态不是性同意，不能在胁迫或无法退出时生成露骨性行为。\n- 纯爱路线以共同承诺推进；黄毛／NTR 路线以成年人自愿的诱惑、三角关系、嫉妒与背叛选择推进；黑暗权力路线必须先记录预先约定、禁区、停止词和退出机制。\n- 露骨模式开启且条件满足时，可具体描写成人身体亲密、感官反应、沟通和事后照顾，并保持角色人格、关系阶段和剧情因果。任何停止词或撤回同意都立即结束露骨描写。\n- 数值 0–49 显示为堕落值；达到 50 后进入调教路线，50–100 显示为调教值。50 点只解锁角色主动询问或提出成人事件的确认窗口，不能自动生成同意；每次仍需当前、清醒、自由、可撤回的明确回应。\n- 明确同意进入黑暗权力场景后，可以把半推半就、挣扎、嘴硬、压制、命令、控制和战败感作为预先约定的表演；实际犹豫、停止词或撤回会立即结束露骨内容。\n- 性同意状态依次为“未询问、正在确认、明确同意、暂停、已撤回”。同意只覆盖已经说明的本次行为；换行为、升级强度、加入第三人或进入真实胁迫状态必须重新确认。`
+      ? `- 当前强度：${adult.labels?.[adult.effective] || adult.effective}。\n- 只有卡内双方均明确为 18 岁以上虚构成年人、当前能自由选择且双方明确自愿时，才允许进入露骨亲密场景；同意可随时撤回。\n- 战败、负伤、俘虏、囚困、审问、控制和反制可以写得黑暗激烈，但这些状态不是性同意，不能在胁迫或无法退出时生成露骨性行为。\n- 纯爱路线以共同承诺推进；黄毛／NTR 路线以成年人自愿的诱惑、三角关系、嫉妒与背叛选择推进；黑暗权力路线必须先记录预先约定、禁区、停止词和退出机制。${ntrEngineBlock}\n- 露骨模式开启且条件满足时，可具体描写成人身体亲密、感官反应、沟通和事后照顾，并保持角色人格、关系阶段和剧情因果。任何停止词或撤回同意都立即结束露骨描写。\n- 数值 0–49 显示为堕落值；达到 50 后进入调教路线，50–100 显示为调教值。50 点只解锁角色主动询问或提出成人事件的确认窗口，不能自动生成同意；每次仍需当前、清醒、自由、可撤回的明确回应。\n- 明确同意进入黑暗权力场景后，可以把半推半就、挣扎、嘴硬、压制、命令、控制和战败感作为预先约定的表演；实际犹豫、停止词或撤回会立即结束露骨内容。\n- 性同意状态依次为“未询问、正在确认、明确同意、暂停、已撤回”。同意只覆盖已经说明的本次行为；换行为、升级强度、加入第三人或进入真实胁迫状态必须重新确认。`
       : `- 当前强度：${adult.labels?.[adult.effective] || (adult.effective === "off" ? "关闭亲密剧情" : "浪漫亲密（不露骨）")}。\n- 当前不启用露骨成人路线，不计算堕落值或调教值，不生成露骨成人事件。`;
   const adultOutputLine = adultEnabled && !canonPolicy.relationshipLock
     ? `[仅发生相关事件时追加：0–49 使用【堕落值 ±N（原因），当前阶段（累计点数）】；50–100 使用【调教值 ±N（原因），当前阶段（累计点数）】]\n`

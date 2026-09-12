@@ -819,13 +819,57 @@ function buildUserRole({ roleId, customDescription, character, work, motifs, can
   };
 }
 
-function buildAdultSettings(requestedLevel, adultConfirmed, subjectType = "fictional", canonPolicy = {}) {
+function buildNtrScenario({ perspective, originalPartner, thirdParty, userRole, character, userName }) {
+  const requestedPerspective = ["auto", "user_original_partner", "user_third_party", "character_third_party"].includes(perspective) ? perspective : "auto";
+  const userLabel = normalizedText(userName) || "用户";
+  const autoPerspective = ["villain", "enemy", "rival"].includes(userRole?.id) ? "user_third_party" : "user_original_partner";
+  const resolvedPerspective = requestedPerspective === "auto" ? autoPerspective : requestedPerspective;
+  const suppliedOriginal = normalizedText(originalPartner);
+  const suppliedThird = normalizedText(thirdParty);
+  const scenarios = {
+    user_original_partner: {
+      label: "被夺者视角",
+      target: character,
+      originalPartner: userLabel,
+      thirdParty: suppliedThird || "第三者",
+      summary: `${userLabel}是${character}的原关系对象，${suppliedThird || "第三者"}进入两人的关系。故事从原关系真实状态开始，逐步检验诱惑、隐瞒、背叛与是否重构关系。`
+    },
+    user_third_party: {
+      label: "黄毛／第三者视角",
+      target: character,
+      originalPartner: suppliedOriginal || `${character}的原关系对象`,
+      thirdParty: userLabel,
+      summary: `${character}已有关系对象“${suppliedOriginal || "原伴侣"}”，${userLabel}作为第三者接近。角色不会开场自动动心，必须先出现符合其性格、目标和处境的诱因与选择。`
+    },
+    character_third_party: {
+      label: "角色作为第三者",
+      target: userLabel,
+      originalPartner: suppliedOriginal || `${userLabel}的原关系对象`,
+      thirdParty: character,
+      summary: `${userLabel}已有关系对象“${suppliedOriginal || "原伴侣"}”，${character}作为第三者介入。${character}的接近方式、底线与后果必须保持原作人格。`
+    }
+  };
+  return {
+    requestedPerspective,
+    resolvedPerspective,
+    ...scenarios[resolvedPerspective],
+    sourceMode: requestedPerspective === "auto" ? `根据“${userRole?.label || "用户身份"}”自动安排` : "用户明确选择",
+    originalPartnerInput: suppliedOriginal,
+    thirdPartyInput: suppliedThird,
+    outcomeRule: "NTR 是可进入的 IF 路线，不保证第三者成功；角色可拒绝、坦白、反制、分手、背叛、和解或重构关系。若要求必定成功且不受原作性格约束，应使用 AU。",
+    progression: ["确认原关系与未解决矛盾", "出现符合角色动机的诱因", "试探并记录边界与秘密", "角色主动作出越界、拒绝或坦白选择", "原伴侣发现或真相公开", "按好感、背叛和人格旗标结算后果"]
+  };
+}
+
+function buildAdultSettings(requestedLevel, adultConfirmed, subjectType = "fictional", canonPolicy = {}, ntrConfig = {}) {
+  const character = normalizedText(ntrConfig.character) || "角色";
   const allowed = new Set(["off", "romance", "purelove", "ntr", "dark", "explicit"]);
   const normalized = requestedLevel === "explicit" ? "purelove" : requestedLevel;
   const requested = allowed.has(normalized) ? normalized : "romance";
   const confirmed = adultConfirmed === true;
   const isExplicit = ["purelove", "ntr", "dark"].includes(requested);
   const effective = canonPolicy.relationshipLock ? "off" : (isExplicit && (!confirmed || subjectType !== "fictional")) ? "romance" : requested;
+  const ntrScenario = effective === "ntr" ? buildNtrScenario(ntrConfig) : null;
   const routeContent = {
     off: { chapters: [], endings: [], cgs: [] },
     romance: {
@@ -837,7 +881,7 @@ function buildAdultSettings(requestedLevel, adultConfirmed, subjectType = "ficti
       endings: ["纯爱GE·与你共度日常", "纯爱GE·共同未来", "纯爱BE·承诺破裂", "纯爱隐藏·仍选择你"], cgs: ["纯爱CG·确认心意", "纯爱CG·成人事件", "纯爱CG·晨光之后"]
     },
     ntr: {
-      chapters: [["第三个人出现", "引入同为成年虚构人物的追求者或诱惑者，并明确各方当前关系和边界。", "成人确认完成且身份路线进入关系章"], ["越界之前", "在诱惑、嫉妒与坦白之间作出不可兼得的选择。", "取得 temptation_seen，且所有实际参与者仍能自由拒绝"], ["秘密、发现或坦白", "根据 secret_kept、confession、betrayal 三类旗标决定冲突，不用分数洗掉背叛。", "完成一次三角关系选择"], ["关系重构", "决定分手、和解、开放关系、三方自愿关系或彻底决裂。", "冲突结算且当事人分别表达选择"]],
+      chapters: [["原关系基线", `${ntrScenario?.originalPartner || "原伴侣"}与${ntrScenario?.target || character}的关系必须先由资料与开场事件建立，不把未满足、矛盾或忠诚凭空写死。`, "成人确认完成，参与者身份已确定"], ["第三个人出现", `${ntrScenario?.thirdParty || "第三者"}以符合角色人设的方式进入关系，诱因可以是理解、利益、共同目标、欲望或原关系裂痕，但必须有事件依据。`, "原关系基线完成，temptation_seen 尚未结算"], ["越界之前", "在拒绝、坦白、隐瞒、试探与越界之间作出不可兼得的选择；角色可以让 NTR 失败。", "取得 temptation_seen，且实际参与者能自由拒绝"], ["秘密、发现或坦白", "根据 secret_kept、confession、betrayal 三类旗标决定冲突，不用分数洗掉背叛。", "角色已主动完成一次关系选择"], ["关系重构", "决定分手、和解、开放关系、自愿三方关系、第三者胜利或彻底决裂。", "冲突结算且当事人分别表达选择"]],
       endings: ["NTR-GE·坦白后的新约定", "NTR-GE·自愿三方关系", "NTR-BE·无法修复的背叛", "NTR-BE·黄毛胜利", "NTR隐藏·角色主动改写关系"], cgs: ["NTR-CG·第三人的视线", "NTR-CG·秘密被撞见", "NTR-CG·关系重构"]
     },
     dark: {
@@ -852,6 +896,7 @@ function buildAdultSettings(requestedLevel, adultConfirmed, subjectType = "ficti
     subjectType,
     lockedByCanon: canonPolicy.relationshipLock === true,
     lockReason: canonPolicy.relationshipLock ? `原作严格模式锁定与用户的恋爱或成人亲密路线：${canonPolicy.reason}` : "",
+    ntrScenario,
     labels: { off: "关闭亲密剧情", romance: "浪漫亲密（不露骨）", purelove: "纯爱成人剧情（露骨）", ntr: "黄毛／NTR 成人剧情（露骨、自愿幻想）", dark: "黑暗权力幻想（露骨、预先同意）" },
     routeRules: effective === "purelove" ? [
       "以双方排他的情感承诺、信任建立和共同选择推进成人章节。",
@@ -1110,7 +1155,14 @@ export function analyzeCharacter(input) {
   const userRole = buildUserRole({ roleId: resolvedUserRole, customDescription: input.userRoleCustom, character, work, motifs, canonPolicy });
   userRole.selectionMode = requestedUserRole === "auto" ? "简单模式自动判定" : "用户明确选择";
   userRole.requestedRole = requestedUserRole;
-  const adultSettings = buildAdultSettings(normalizedText(input.adultContent), input.adultConfirmed, subjectType, canonPolicy);
+  const adultSettings = buildAdultSettings(normalizedText(input.adultContent), input.adultConfirmed, subjectType, canonPolicy, {
+    perspective: normalizedText(input.ntrPerspective),
+    originalPartner: input.ntrOriginalPartner,
+    thirdParty: input.ntrThirdParty,
+    userRole,
+    character,
+    userName: input.userName
+  });
   const affinity = buildAffinity(dialogueScenes, original, character, userRole, canonPolicy);
   const evidenceNote = subjectType === "fictional"
     ? "性格词、关系和说话风格均来自来源文本或对白统计；好感度数值、行为阶段和新场景对白由应用规则原创，不属于游戏或小说官方内容。"

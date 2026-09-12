@@ -115,6 +115,21 @@
             </label>
             <label class="check-card"><input id="adult-confirmed" type="checkbox"><span><b>卡内相关人物均为 18+ 虚构成年人</b><small>露骨模式必须确认；战败、俘虏与被强迫不等于同意</small></span></label>
           </div>
+          <div id="ntr-fields" class="profile-fields" hidden>
+            <div class="field-grid two">
+              <label>NTR 中你是谁
+                <select id="ntr-perspective">
+                  <option value="auto" selected>自动安排</option>
+                  <option value="user_original_partner">被夺者视角：你是角色原伴侣</option>
+                  <option value="user_third_party">黄毛视角：你追求已有伴侣的角色</option>
+                  <option value="character_third_party">角色第三者视角：角色追求已有伴侣的你</option>
+                </select>
+              </label>
+              <label>原关系对象 <span class="optional">可选</span><input id="ntr-original-partner" placeholder="留空时使用“原伴侣”"></label>
+            </div>
+            <label>第三者名称 <span class="optional">可选</span><input id="ntr-third-party" placeholder="留空时由身份视角自动确定"></label>
+            <p class="hint">NTR 自动按 IF 路线生成：先建立原关系和人物动机，再经过诱因、动摇、越界选择、发现与后果；不会开场直接把角色写成已经背叛。</p>
+          </div>
           <p class="hint">身份决定初始好感、第一章、角色立场、专属剧情与结局；身份补充可以把任何预设改成你自己的版本。</p>
         </section>
 

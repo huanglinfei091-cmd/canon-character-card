@@ -15,6 +15,7 @@ const $ = selector => document.querySelector(selector);
 const elements = {
   work: $("#work"), character: $("#character"), userName: $("#user-name"),
   userRole: $("#user-role"), userRoleCustom: $("#user-role-custom"), canonMode: $("#canon-mode"), adultContent: $("#adult-content"), adultConfirmed: $("#adult-confirmed"),
+  ntrFields: $("#ntr-fields"), ntrPerspective: $("#ntr-perspective"), ntrOriginalPartner: $("#ntr-original-partner"), ntrThirdParty: $("#ntr-third-party"),
   subjectType: $("#subject-type"), profileMode: $("#profile-mode"), subjectGender: $("#subject-gender"),
   realRelationship: $("#real-relationship"), manualTraits: $("#manual-traits"), customPersona: $("#custom-persona"),
   realProfileFields: $("#real-profile-fields"), complexPersonaField: $("#complex-persona-field"), realPermissionCard: $("#real-permission-card"), realPermission: $("#real-permission"),
@@ -310,6 +311,17 @@ function renderOverview(data) {
   route.append(plotGrid); fragment.append(route);
   if ((adult.chapters || []).length) {
     const adultRoute = section(`成人专属路线 · ${adult.labels?.[adult.effective] || adult.effective}`);
+    if (adult.ntrScenario) {
+      adultRoute.append(el("p", "route-note", adult.ntrScenario.summary));
+      const participants = el("div", "evidence-list");
+      participants.append(
+        el("div", "evidence", `故事目标：${adult.ntrScenario.target}`),
+        el("div", "evidence", `原关系对象：${adult.ntrScenario.originalPartner}`),
+        el("div", "evidence", `第三者：${adult.ntrScenario.thirdParty}`),
+        el("div", "evidence", `结局保证：${adult.ntrScenario.outcomeRule}`)
+      );
+      adultRoute.append(participants);
+    }
     const adultGrid = el("div", "ending-grid");
     adult.chapters.forEach(item => {
       const node = el("article", "ending-card");
@@ -615,6 +627,9 @@ async function buildCard() {
       userRole: elements.userRole.value, userRoleCustom: elements.userRoleCustom.value.trim(),
       canonMode: elements.canonMode.value,
       adultContent: elements.adultContent.value, adultConfirmed: elements.adultConfirmed.checked,
+      ntrPerspective: elements.ntrPerspective.value,
+      ntrOriginalPartner: elements.ntrOriginalPartner.value.trim(),
+      ntrThirdParty: elements.ntrThirdParty.value.trim(),
       subjectType: elements.subjectType.value, profileMode: elements.profileMode.value,
       subjectGender: elements.subjectGender.value, realRelationship: elements.realRelationship.value,
       manualTraits: elements.manualTraits.value.trim(), customPersona: elements.customPersona.value.trim(),
@@ -760,8 +775,20 @@ function invalidateGeneratedCard() {
 elements.userRole.addEventListener("change", invalidateGeneratedCard);
 elements.userRoleCustom.addEventListener("change", invalidateGeneratedCard);
 elements.canonMode.addEventListener("change", invalidateGeneratedCard);
-elements.adultContent.addEventListener("change", invalidateGeneratedCard);
+elements.adultContent.addEventListener("change", () => { syncNtrFields(); invalidateGeneratedCard(); });
 elements.adultConfirmed.addEventListener("change", invalidateGeneratedCard);
+elements.ntrPerspective.addEventListener("change", invalidateGeneratedCard);
+elements.ntrOriginalPartner.addEventListener("change", invalidateGeneratedCard);
+elements.ntrThirdParty.addEventListener("change", invalidateGeneratedCard);
+
+function syncNtrFields() {
+  const enabled = elements.adultContent.value === "ntr" && elements.subjectType.value === "fictional";
+  elements.ntrFields.hidden = !enabled;
+  if (enabled && elements.canonMode.value === "canon-strict") {
+    elements.canonMode.value = "canon-if";
+    setStatus("NTR 属于关系分歧路线，已自动切换为“原作优先 IF”；人物核心性格仍保持原作。", false);
+  }
+}
 
 function syncProfileFields() {
   const isReality = elements.subjectType.value !== "fictional";
@@ -773,6 +800,7 @@ function syncProfileFields() {
     elements.adultContent.value = "romance";
     elements.adultConfirmed.checked = false;
   }
+  syncNtrFields();
 }
 
 elements.subjectType.addEventListener("change", () => { syncProfileFields(); resetForIdentityChange(); });
