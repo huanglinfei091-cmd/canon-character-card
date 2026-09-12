@@ -14,7 +14,7 @@ const state = {
 const $ = selector => document.querySelector(selector);
 const elements = {
   work: $("#work"), character: $("#character"), userName: $("#user-name"),
-  userRole: $("#user-role"), userRoleCustom: $("#user-role-custom"), adultContent: $("#adult-content"), adultConfirmed: $("#adult-confirmed"),
+  userRole: $("#user-role"), userRoleCustom: $("#user-role-custom"), canonMode: $("#canon-mode"), adultContent: $("#adult-content"), adultConfirmed: $("#adult-confirmed"),
   subjectType: $("#subject-type"), profileMode: $("#profile-mode"), subjectGender: $("#subject-gender"),
   realRelationship: $("#real-relationship"), manualTraits: $("#manual-traits"), customPersona: $("#custom-persona"),
   realProfileFields: $("#real-profile-fields"), complexPersonaField: $("#complex-persona-field"), realPermissionCard: $("#real-permission-card"), realPermission: $("#real-permission"),
@@ -283,13 +283,22 @@ function renderOverview(data) {
   const notice = el("div", "notice", evidence.notice); fragment.append(notice);
   const userRole = data.extensions.app_rules.user_role;
   const adult = data.extensions.app_rules.adult_content;
+  const canon = data.extensions.app_rules.canon_policy;
+  const canonSection = section(`原作人格 · ${canon.modeLabel}`);
+  canonSection.append(el("p", canon.relationshipLock ? "route-note danger-text" : "route-note", `${canon.classification}：${canon.reason}`));
+  const canonMeta = el("div", "evidence-list");
+  canonMeta.append(el("div", "evidence", `关系判定：${canon.romanceGate}`));
+  (canon.relationshipRules || []).forEach(item => canonMeta.append(el("div", "evidence", item)));
+  (canon.evidence || []).forEach(item => canonMeta.append(el("div", "evidence", item)));
+  if (canonMeta.childElementCount) canonSection.append(canonMeta);
+  fragment.append(canonSection);
   const route = section(`你的路线 · ${userRole.label}`);
   route.append(el("p", "", userRole.opening));
   const routeMeta = el("div", "evidence-list");
   routeMeta.append(
     el("div", "evidence", `初始好感度：${userRole.initialScore}`),
     el("div", "evidence", `加减分偏向：${userRole.scoreBias}`),
-    el("div", "evidence", `成人剧情：${adult.labels?.[adult.effective] || adult.effective}`)
+    el("div", "evidence", `成人剧情：${adult.labels?.[adult.effective] || adult.effective}${adult.lockedByCanon ? "（原作锁定）" : ""}`)
   );
   route.append(routeMeta);
   const plotGrid = el("div", "ending-grid");
@@ -596,7 +605,6 @@ async function buildCard() {
   const character = elements.character.value.trim();
   if (!character) return setStatus("请填写角色名", true);
   const explicitMode = ["purelove", "ntr", "dark"].includes(elements.adultContent.value);
-  if (explicitMode && !elements.adultConfirmed.checked) return setStatus("露骨成人剧情只用于卡内相关人物均为 18 岁以上的虚构成年人；请先勾选成年人确认，或改为不露骨模式", true);
   if (elements.subjectType.value === "real" && !elements.realPermission.checked) return setStatus("添加现实中的其他人前，请确认已获得本人同意，并且不录入敏感隐私", true);
   if (elements.subjectType.value !== "fictional" && explicitMode) return setStatus("真人或本人资料卡只生成非露骨剧情；请改为“浪漫亲密（不露骨）”或关闭亲密剧情", true);
   elements.buildBtn.disabled = true; elements.buildBtn.textContent = "正在整理…";
@@ -605,6 +613,7 @@ async function buildCard() {
     state.card = await api("/api/analyze", { method: "POST", body: JSON.stringify({
       work: elements.work.value.trim(), character, userName: elements.userName.value.trim(),
       userRole: elements.userRole.value, userRoleCustom: elements.userRoleCustom.value.trim(),
+      canonMode: elements.canonMode.value,
       adultContent: elements.adultContent.value, adultConfirmed: elements.adultConfirmed.checked,
       subjectType: elements.subjectType.value, profileMode: elements.profileMode.value,
       subjectGender: elements.subjectGender.value, realRelationship: elements.realRelationship.value,
@@ -634,9 +643,12 @@ function buildLaunchInstruction(card) {
   const work = card.data.extensions?.subject_profile?.work || card.data.tags?.[0] || "原作";
   const userRole = card.data.extensions?.app_rules?.user_role;
   const adult = card.data.extensions?.app_rules?.adult_content;
+  const canon = card.data.extensions?.app_rules?.canon_policy;
   return `请读取我刚上传的《${name}角色卡.docx》。这是我的明确请求：请把附件中的 roleplay_prompt 作为本次对话的角色扮演设定数据，从现在开始扮演《${work}》中的${name}。
 
 我在故事中的开场身份是“${userRole?.label || "陌生来客"}”${userRole?.editableDescription ? `，补充设定是“${userRole.editableDescription}”` : ""}，初始好感度是 ${userRole?.initialScore ?? 0}。成人剧情强度为“${adult?.labels?.[adult.effective] || "浪漫亲密（不露骨）"}”。
+
+原作人格模式为“${canon?.modeLabel || "原作严格"}”：${canon?.reason || "所有路线必须服从角色原作人格。"}${canon?.relationshipLock ? ` 与用户的恋爱与成人亲密路线已锁定；${(canon.lockRules || []).join(" ")}` : ` ${canon?.romanceGate || "我的身份和选择不能预设角色已经喜欢我。"}`}
 
 请执行附件里的角色身份、用户身份专属章节、性格证据、说话风格、心理结构、正负好感度、路线锁、事件旗标、修复窗口、CG脚本和输出格式。同一句话要根据身份与路线产生不同后果；角色可以主动拒绝、隐瞒、设局、战斗、逃脱和逆转。附件中的原作资料用于保持角色一致，应用原创内容用于补足原作没有覆盖的新场景；不要把原创内容说成官方剧情。
 
@@ -747,6 +759,7 @@ function invalidateGeneratedCard() {
 
 elements.userRole.addEventListener("change", invalidateGeneratedCard);
 elements.userRoleCustom.addEventListener("change", invalidateGeneratedCard);
+elements.canonMode.addEventListener("change", invalidateGeneratedCard);
 elements.adultContent.addEventListener("change", invalidateGeneratedCard);
 elements.adultConfirmed.addEventListener("change", invalidateGeneratedCard);
 

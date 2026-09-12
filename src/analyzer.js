@@ -227,7 +227,143 @@ function detectTone(traits, speechStyle) {
   return "自然克制";
 }
 
-function buildOriginalDialogues({ character, work, traits, motifs, speechStyle, userName }) {
+function buildCanonBehaviorPolicy({ character, work, sources, canonMode }) {
+  const mode = ["canon-strict", "canon-if", "au"].includes(canonMode) ? canonMode : "canon-strict";
+  const combined = sources.map(source => source.text).join("\n");
+  const knownNonRomantic = /^(古月)?方源$|^fang\s*yuan$/iu.test(character) && /蛊真人|reverend\s*insanity/i.test(`${work}\n${combined}`);
+  const explicitPattern = /(不需要|无意|拒绝|不会|不可能|抛弃|舍弃|斩断|摒弃).{0,18}(爱情|恋爱|情爱|爱人|情感)|(爱情|恋爱|情爱|感情).{0,18}(无用|累赘|弱点|工具|不屑|舍弃|妨碍|阻碍)/u;
+  const explicitNonRomantic = explicitPattern.test(combined);
+  const nonRomantic = knownNonRomantic || explicitNonRomantic;
+  const scoreTerms = terms => terms.reduce((sum, term) => sum + Math.min(countOccurrences(combined, term), 4), 0);
+  const goalScore = scoreTerms(["永生", "利益至上", "不择手段", "野心", "权谋", "算计", "棋子", "利用他人", "复仇", "执念", "目的高于", "目标高于"]);
+  const manipulativeScore = scoreTerms(["城府", "狡猾", "欺骗", "伪装", "操纵", "利用", "算计", "冷酷", "无情", "残忍", "权谋"]);
+  const guardedScore = scoreTerms(["谨慎", "警惕", "戒备", "多疑", "克制", "寡言", "冷漠", "高冷", "孤傲", "疏离", "理性", "沉稳", "不轻易相信"]);
+  const dutyScore = scoreTerms(["责任感", "职责", "使命", "守护", "原则", "正直", "忠诚", "纪律", "信念", "坚定"]);
+  const warmScore = scoreTerms(["温柔", "体贴", "善良", "细腻", "热情", "重感情", "珍惜", "关心", "照顾", "乐于助人"]);
+  const playfulScore = scoreTerms(["活泼", "开朗", "幽默", "调皮", "爱开玩笑", "直率", "乐观", "天真"]);
+  const canonBondSentences = splitSentences(combined).filter(sentence =>
+    sentence.includes(character) && /恋人|爱人|情侣|妻子|丈夫|伴侣|道侣|深爱|恋慕|爱慕|心上人/u.test(sentence) && !/没有|并无|从未|不是|拒绝|失去/u.test(sentence)
+  ).slice(0, 4);
+  const existingCanonBond = canonBondSentences.length > 0;
+  const archetypeScores = [
+    ["strategic", goalScore * 2 + manipulativeScore],
+    ["guarded", guardedScore],
+    ["duty", dutyScore],
+    ["warm", warmScore],
+    ["playful", playfulScore]
+  ].sort((a, b) => b[1] - a[1]);
+  const archetype = nonRomantic ? "strategic" : archetypeScores[0][1] > 0 ? archetypeScores[0][0] : "neutral";
+  const archetypeLabels = { strategic: "目标／利益驱动", guarded: "克制戒备", duty: "责任／使命驱动", warm: "温和关怀", playful: "外向活跃", neutral: "证据不足，谨慎推进" };
+  const evidence = splitSentences(combined).filter(sentence => /永生|利益|冷酷|无情|爱情|恋爱|情爱|不择手段|目的|目标|执念|谨慎|警惕|克制|责任|使命|守护|温柔|体贴|活泼|开朗|恋人|爱人|伴侣/.test(sentence)).slice(0, 8);
+  const strictLock = mode === "canon-strict" && nonRomantic;
+  const relationshipLock = strictLock || (mode === "canon-strict" && existingCanonBond);
+  const relationshipRules = {
+    strategic: ["先判断收益、成本、能力和风险，再决定合作深度。", "策略性温和、保护或让步不自动代表爱意。", "高好感优先解释为不可替代价值、可靠合作或棋逢对手。"],
+    guarded: ["信任增长必须经过多次可验证行动，不能靠告白或夸赞跳级。", "亲近表现以减少戒备、分享有限信息和允许并肩为主。", "即使产生感情，也保持克制表达和个人边界。"],
+    duty: ["责任、使命和原则优先于关系奖励。", "认可主要通过共同承担、可靠分工和守住底线表现。", "感情不能要求角色背弃职责或放弃守护对象。"],
+    warm: ["温柔、照顾和友善是基础人格，不自动等于恋爱信号。", "是否动心必须由专属事件、互相了解和明确选择证明。", "冲突时仍会坚持自己的原则，不因亲密无条件顺从。"],
+    playful: ["玩笑、热情和主动靠近是表达习惯，不自动等于恋爱承诺。", "认真情感必须在停止玩笑、承担后果和明确选择的事件中确认。", "负面路线应让外向表达发生有因果的收敛或反转。"],
+    neutral: ["资料不足时从低预设开始，不擅自补成温柔、恋爱或依赖型人格。", "先通过事件建立可验证的相处模式，再升级关系。", "新场景只沿已有证据推演，并把不确定处保留为不确定。"]
+  }[archetype];
+  return {
+    mode,
+    modeLabel: mode === "canon-strict" ? "原作严格" : mode === "canon-if" ? "原作优先 IF" : "AU 自由改写",
+    classification: nonRomantic ? "非恋爱型／核心目标高于关系" : archetypeLabels[archetype],
+    archetype,
+    archetypeLabel: archetypeLabels[archetype],
+    archetypeScores: Object.fromEntries(archetypeScores),
+    existingCanonBond,
+    canonBondEvidence: canonBondSentences,
+    nonRomantic,
+    strictLock,
+    relationshipLock,
+    romanceAllowed: !relationshipLock,
+    adultAllowed: !relationshipLock,
+    reason: knownNonRomantic
+      ? `${character}的原作核心驱动以永生、利益判断和目的达成为中心；普通恋爱依赖、无条件牺牲和甜宠模板会破坏人物一致性。`
+      : explicitNonRomantic ? "来源文本出现明确拒绝、舍弃或工具化爱情的表达，原作严格模式据此锁定恋爱路线。" : `依据当前资料归为“${archetypeLabels[archetype]}”；用户选择只定义用户的身份和意图，不预设角色已经喜欢、信任或依赖用户。${existingCanonBond ? "资料还显示角色存在原作既有亲密关系，不能被用户路线无代价覆盖。" : ""}`,
+    evidence,
+    relationshipRules,
+    romanceGate: strictLock
+      ? "永久锁定；只有切换到明确标注的 IF/AU 才能改写。"
+      : existingCanonBond && mode === "canon-strict"
+        ? "必须先证明用户身份与原作既有关系相符，或在剧情中合乎人设地处理原关系；不得直接替换。"
+        : "初始不预设双方互相吸引；至少经过专属事件、关键旗标与角色主动选择后，才允许判定恋爱成立。",
+    userRouteCannotSetFeelings: true,
+    lockRules: strictLock ? [
+      "不生成恋爱、告白、吃醋、占有、依赖、纯爱、NTR、调教或成人亲密剧情。",
+      "用户选择恋爱候选只表示用户试图接近角色，不表示角色回应爱情。",
+      "高好感度解释为能力认可、利益一致、长期合作、棋逢对手或有限信任。",
+      "角色可伪装温和、利用情感或说策略性谎言，但内心必须说明其目的，不得把伪装写成真实恋爱。"
+    ] : relationshipLock ? [
+      "不让用户路线覆盖、抹除或贬低原作已有亲密关系。",
+      "用户选择恋爱候选只表示发起追求，不表示角色接受或背叛原关系。",
+      "原作严格模式下关闭与用户的成人亲密路线；需要改写时必须切换并标注 IF/AU。"
+    ] : [
+      "用户身份只定义用户立场，不得预设角色已经喜欢、信任、依赖或同意。",
+      "温柔、保护、玩笑、并肩或高好感均不自动等于恋爱；必须由专属事件和角色主动选择确认。"
+    ]
+  };
+}
+
+const NON_ROMANTIC_SCENE_LINES = {
+  first_meeting: ["先说清目的。没有足够价值，这次见面就到这里。", "同行是一笔交易，条件和退路都要先写明。", "我记住你，不代表信任你；之后看结果。"],
+  daily_greeting: ["有事直说。寒暄不能改变今天的计划。", "状态正常就出发，别在无关细节上浪费时间。", "你按时出现，至少说明这次合作还能继续。"],
+  user_injured: ["能走就自己处理；不能走就说明你还剩什么作用。", "我会止血，因为现在失去你不合算。别误会原因。", "伤势会影响计划，把真实情况报出来。"],
+  character_injured: ["不用摆出担心的样子。告诉我敌人的位置。", "帮我处理伤口可以，这笔人情之后按价值结算。", "疼痛不会改变目标，只会改变完成目标的方法。"],
+  danger: ["守住你的位置。你活着，计划才少一个变量。", "背后暂时交给你；若判断错误，我会立刻止损。", "先解决共同敌人，之后我们的账另算。"],
+  disagreement: ["拿事实和收益说服我，情绪没有议价价值。", "你的方案若更有效，我没有坚持错误的兴趣。", "分歧可以保留，妨碍目标就必须处理。"],
+  sadness: ["情绪不会自己消失，但也不能替你作决定。", "需要时间就说清楚期限，我会据此调整计划。", "我不负责安慰你；若你还想继续，就先站起来。"],
+  praise: ["评价没有价值，能被验证的结果才有。", "你若真这么判断，就在下一次选择里证明。", "奉承对我无用，省下来谈条件。"],
+  rainy_night: ["雨会掩盖脚步声，今晚轮流警戒。", "位置可以分你一半，代价是守住后半夜。", "别把暂时共处理解成亲近，只是外面更不利。"],
+  reunion: ["回来就说明你还有未完成的事。先说结果。", "我没有等你，只是计划里暂时保留了这个变量。", "能再次见面是能力与选择的结果，不是命运。"],
+  misunderstanding: ["把证据摆出来。真相不需要靠相信维持。", "若是误会，核验后自然会消失；若是谎言，后果也一样明确。", "我给你解释的机会，是因为现在判断仍有收益。"],
+  vulnerability: ["弱点一旦说出口，就会成为别人手里的筹码。", "你知道得够多了；再向前一步，关系就会改变。", "我可以承认风险，但不会把决定权交出去。"]
+};
+
+function buildNonRomanticLines(sceneId, stageIndex, addressee, firstPerson) {
+  const base = NON_ROMANTIC_SCENE_LINES[sceneId] || NON_ROMANTIC_SCENE_LINES.first_meeting;
+  const assessments = [
+    `${firstPerson}尚未确认${addressee}是否有保留价值。`,
+    `${addressee}已经证明了初步作用，但替代者仍然存在。`,
+    `目前合作效率足够高，${firstPerson}愿意增加有限投入。`,
+    `${addressee}是少数经得起验证的合作者，这份判断比好听的话可靠。`,
+    `长期保留这段同盟的收益高于更换人选；这是选择，不是依赖。`
+  ];
+  return base.map(line => `${line}${assessments[stageIndex]}`);
+}
+
+const CANON_GROUNDED_SCENE_LINES = {
+  first_meeting: ["先把来意说清楚，再决定接下来怎么走。", "同行不是一句话决定的，先看彼此能否配合。", "我记住你了，其他判断留给之后的行动。"],
+  daily_greeting: ["早。先确认今天各自要做的事。", "状态还好吗？别让小问题影响后面的安排。", "有想说的就直说，时间还够。"],
+  user_injured: ["先处理伤口，是否严重要看过才知道。", "别用一句没事带过，把真实情况说出来。", "我会帮你，但接下来要按伤势重新安排。"],
+  character_injured: ["伤不致命，先确保周围没有新的危险。", "需要帮忙的部分我会说，不必替我做决定。", "这次可以交给你处理，动作稳一点。"],
+  danger: ["先看出口和敌人的位置，不要被打散。", "守住你负责的方向，有变化立刻出声。", "活下来比逞强重要，按已经说好的分工行动。"],
+  disagreement: ["我不同意，但会把你的理由听完。", "先分清事实、目标和情绪，再决定谁调整方案。", "分歧可以存在，越过彼此原则不行。"],
+  sadness: ["需要安静就先安静，我不会替你定义感受。", "失败已经发生，等你愿意时再谈能挽回什么。", "我可以留在这里，但下一步仍由你自己选择。"],
+  praise: ["评价收到了，我更在意它能否被行动验证。", "谢谢。先别把一次表现说得太满。", "我会记住这句话，也会记住你之后怎么做。"],
+  rainy_night: ["雨暂时停不了，先把位置和警戒顺序分好。", "那边更避风，你可以过去，但别挡住出口。", "雨声适合谈事，也适合把不想说的留到以后。"],
+  reunion: ["你回来了。先让我确认这段时间发生了什么。", "重逢不会自动抹去分别期间的变化。", "能再次见面很好，接下来要不要同行仍由现在的选择决定。"],
+  misunderstanding: ["不要靠猜，先把事实和各自看到的部分对上。", "我会听解释，但不会因为关系标签跳过核验。", "如果是误会就澄清；如果是隐瞒，就处理它造成的后果。"],
+  vulnerability: ["这件事不容易开口，所以别催我一次说完。", "我可以告诉你一部分，剩下的要看之后是否安全。", "听见弱点不等于得到处置它的权利。"]
+};
+
+const ARCHETYPE_STAGE_NOTES = {
+  strategic: ["现在只评估价值与风险。", "你证明了初步作用，但替代方案仍在。", "合作效率已经值得增加投入。", "你是少数经得起验证的合作者。", "维持长期盟约符合目标，但这不是依赖。"],
+  guarded: ["我仍保留距离和退路。", "戒备有所下降，但不会因此交出隐私。", "你已经得到有限信任。", "我愿意让你看见一部分真实判断。", "这份信任很深，却仍有清楚的边界。"],
+  duty: ["先以职责和原则判断。", "你是否可靠，要看能否完成自己的部分。", "共同承担让分工变得稳定。", "我愿意把重要任务交给你。", "关系再深，也不能要求彼此背弃使命。"],
+  warm: ["关心是我的处事方式，不代表关系已经被定义。", "我开始熟悉你的习惯，但仍尊重各自边界。", "这份照顾来自逐渐建立的信任。", "我会更坦率地表达在意，但不替你决定。", "你已经十分重要；它是何种感情，必须由专属剧情和双方选择确认。"],
+  playful: ["轻松语气只是习惯，不代表已经亲近。", "我愿意多接几句玩笑，也会观察你是否认真。", "默契开始形成，但重要问题不能用玩笑带过。", "我会主动拉你进入行动，也愿意承担玩笑后的后果。", "即使表现得自然亲近，关系性质仍要在认真选择中确认。"],
+  neutral: ["现有资料不足，我不会预设关系。", "你留下了可验证的第一印象。", "相处记录开始形成稳定判断。", "我愿意增加信任，但不会突然改变核心性格。", "你已进入长期选择；关系性质仍由事件和双方明确决定。"]
+};
+
+function buildCanonGroundedLines(sceneId, stageIndex, canonPolicy) {
+  const base = CANON_GROUNDED_SCENE_LINES[sceneId] || CANON_GROUNDED_SCENE_LINES.first_meeting;
+  const notes = ARCHETYPE_STAGE_NOTES[canonPolicy?.archetype] || ARCHETYPE_STAGE_NOTES.neutral;
+  return base.map(line => `${line}${notes[stageIndex]}`);
+}
+
+function buildOriginalDialogues({ character, work, traits, motifs, speechStyle, userName, canonPolicy }) {
   const seed = hashSeed(`${work}:${character}`);
   const tone = detectTone(traits, speechStyle);
   const firstPerson = speechStyle.selfReferences?.[0]?.value || "我";
@@ -240,12 +376,18 @@ function buildOriginalDialogues({ character, work, traits, motifs, speechStyle, 
   const firm = tone === "沉稳坚定";
   const suffix = lively ? particle : "";
 
-  const stages = [
+  const stages = canonPolicy?.strictLock ? [
+    { level: "Lv.0", range: "0–9", name: "衡量", address: addressee, distance: "只评估目的、能力和风险", trust: "不透露真实计划" },
+    { level: "Lv.1", range: "10–29", name: "可用", address: addressee, distance: "允许有限交易和临时合作", trust: "只交付可撤回的信息" },
+    { level: "Lv.2", range: "30–49", name: "合作", address: addressee, distance: "承认效率与互补价值", trust: "共享目标所需信息但保留底牌" },
+    { level: "Lv.3", range: "50–79", name: "认可", address: addressee, distance: "把对方视为少数可靠合作者", trust: "允许参与高风险计划但随时保留止损" },
+    { level: "Lv.4", range: "80–99", name: "长期盟约", address: addressee, distance: "主动维持高价值同盟", trust: "可交付重要任务，但核心目标永不让位于关系" }
+  ] : [
     { level: "Lv.0", range: "0–9", name: "观察", address: addressee, distance: "礼貌观察并保留边界", trust: "不主动透露私人情绪" },
     { level: "Lv.1", range: "10–29", name: "初识", address: addressee, distance: "愿意一起行动并回应日常话题", trust: "会记住对方的小习惯" },
     { level: "Lv.2", range: "30–49", name: "熟悉", address: addressee, distance: "主动协助并分享判断", trust: "允许对方看见犹豫和疲惫" },
-    { level: "Lv.3", range: "50–79", name: "信任", address: addressee, distance: "关心会先于客套", trust: "会直接表达担忧与依赖" },
-    { level: "Lv.4", range: "80–99", name: "羁绊", address: addressee, distance: "稳定维护彼此选择和边界", trust: "愿意坦白最深的顾虑与承诺" }
+    { level: "Lv.3", range: "50–79", name: "信任", address: addressee, distance: "允许更直接的关心、合作或表达", trust: "关系含义仍由角色性格和事件旗标决定" },
+    { level: "Lv.4", range: "80–99", name: "羁绊", address: addressee, distance: "稳定维护彼此选择和边界", trust: "不自动等于恋爱；核心目标和价值观仍有效" }
   ];
 
   const reactions = {
@@ -256,7 +398,12 @@ function buildOriginalDialogues({ character, work, traits, motifs, speechStyle, 
     bonded: cool ? "没有夸张表态，只把退路和后背都交给你" : "会明确站在你身边，也尊重你自己的决定"
   };
 
-  const stageReaction = [reactions.stranger, reactions.familiar, reactions.trusted, reactions.close, reactions.bonded];
+  const groundedCanon = canonPolicy?.mode === "canon-strict";
+  const archetypeReactions = (ARCHETYPE_STAGE_NOTES[canonPolicy?.archetype] || ARCHETYPE_STAGE_NOTES.neutral).map(note => note.replace(/[。]$/u, ""));
+  const stageReaction = canonPolicy?.strictLock
+    ? ["保持可撤离站位，只衡量来意与风险", "允许对方进入临时计划，但不减少必要戒备", "按合作效率分配任务和情报", "承认对方是少数可靠合作者，仍保留止损方案", "主动维护长期同盟，因为它持续符合核心目标"]
+    : groundedCanon ? archetypeReactions
+    : [reactions.stranger, reactions.familiar, reactions.trusted, reactions.close, reactions.bonded];
   const scenes = [
     {
       id: "first_meeting", name: "初次相遇", stimulus: "对方主动介绍自己并询问能否同行",
@@ -476,7 +623,7 @@ function buildOriginalDialogues({ character, work, traits, motifs, speechStyle, 
     stages: stages.map((stage, stageIndex) => ({
       ...stage,
       behavior: `${stageReaction[stageIndex]}；${stage.distance}；${stage.trust}。`,
-      dialogues: seededOrder(scene.lines[stageIndex], seed, sceneIndex * 17 + stageIndex * 5).map(text => ({
+      dialogues: seededOrder(canonPolicy?.strictLock ? buildNonRomanticLines(scene.id, stageIndex, addressee, firstPerson) : groundedCanon ? buildCanonGroundedLines(scene.id, stageIndex, canonPolicy) : scene.lines[stageIndex], seed, sceneIndex * 17 + stageIndex * 5).map(text => ({
         text,
         label: "应用原创对白",
         canonical: false
@@ -499,6 +646,8 @@ function buildOriginalDialogues({ character, work, traits, motifs, speechStyle, 
     addressee,
     traits: traitNames,
     motifs: (motifs || []).slice(0, 8).map(item => item.text),
+    relationshipMode: canonPolicy?.strictLock ? "non_romantic" : groundedCanon ? "canon_grounded" : "character_continuous",
+    canonPolicy,
     total: generatedScenes.reduce((sum, scene) => sum
       + scene.stages.reduce((stageSum, stage) => stageSum + stage.dialogues.length, 0)
       + scene.negativeStages.reduce((stageSum, stage) => stageSum + stage.dialogues.length, 0), 0),
@@ -519,7 +668,7 @@ const USER_ROLE_LABELS = {
   custom: "自定义身份"
 };
 
-function buildUserRole({ roleId, customDescription, character, work, motifs }) {
+function buildUserRole({ roleId, customDescription, character, work, motifs, canonPolicy }) {
   const id = USER_ROLE_LABELS[roleId] ? roleId : "stranger";
   const addendum = normalizedText(customDescription).slice(0, 500);
   const motif = index => motifs[index % Math.max(motifs.length, 1)]?.text || ["过往", "承诺", "选择"][index % 3];
@@ -560,9 +709,9 @@ function buildUserRole({ roleId, customDescription, character, work, motifs }) {
       ending: "反派救赎、危险共犯、被角色击败、互相毁灭，或满足隐藏旗标后立场倒置。", cg: ["战败CG·断刃余烬", `${character}在战斗后负伤倒地，武器脱手却仍保持清醒敌意；镜头强调战局、表情与逆转伏笔，不把战败等同于同意。`]
     },
     romance: {
-      initialScore: 20, stance: "双方存在明确吸引，但亲密仍需由剧情、信任与同意推进", bias: "坦白、尊重拒绝和照顾事后感受加分；嫉妒操控、强迫和把好感当许可扣分",
-      plots: [["没有说完的告白", "吸引第一次被点破，但双方可以接受、等待或拒绝。"], ["靠近之前", "边界、欲望和恐惧被具体说清。"], ["公开的选择", "面对身份或阵营压力，决定关系以何种方式继续。"]],
-      ending: "恋人、灵魂伴侣、亲密知己、和平拒绝，或因控制欲进入坏结局。", cg: ["恋爱CG·确认心意", "在明确回应后靠近，镜头聚焦主动触碰、呼吸和彼此确认的眼神。"]
+      initialScore: 0, stance: "用户可能抱有恋爱期待，但角色是否产生吸引尚未确定，必须按原作情感观和后续事件判断", bias: "理解角色、尊重拒绝和完成专属事件可逐步确认可能性；告白本身为 0，纠缠、操控和把路线标签当成角色同意会扣分",
+      plots: [["未被预设的心意", "用户的情感意图第一次被角色察觉；角色可以无感、警惕、拒绝、等待观察或产生有限好奇。"], ["人设兼容试炼", "一次涉及角色核心目标的选择，检验这段追求是否与其价值观兼容。"], ["关系性质确认", "只有角色经过事件后主动作出明确选择，路线才会进入恋爱、知己、拒绝或敌对分支。"]],
+      ending: "可能结算为恋人、亲密知己、和平拒绝、被利用、分道扬镳或坏结局；选择恋爱候选不保证恋爱成功。", cg: ["恋爱判定CG·角色的选择", "在专属事件与关键旗标结算后，由角色主动靠近、保持距离或拒绝；画面不能预先假定双方心意相同。"]
     },
     mystery: {
       initialScore: 0, stance: "你的真实身份被隐藏，线索矛盾会不断累积", bias: "主动交付可验证线索加分；伪造记忆、利用角色缺失的信息扣分更重",
@@ -583,7 +732,7 @@ function buildUserRole({ roleId, customDescription, character, work, motifs }) {
     rival: ["把同行改写成暂时联手，并约定危机结束后继续胜负", "将赞美视作承认实力，反问是否敢再比一次", "不退缩但要求先把意图说清，张力不等于许可", "提出等价交换，绝不白白交出优势"],
     enemy: ["只接受有退出条件的停火，不交出后背", "怀疑赞美是动摇立场的手段", "立刻拉开距离并准备反击", "可能给出真假混合的情报以验证用途"],
     villain: ["把同行理解为监视、诱捕或谈判，表面答应也会准备反制", "判断赞美是否是操纵，并故意给出难以解读的回应", "拒绝被控制；若处于战败或俘虏状态仍会寻找逃脱和逆转", "隐藏核心情报，可能设置一条能反向追踪反派的假线索"],
-    romance: ["把同行理解为关系推进的邀请，但先确认双方期待", "允许喜悦显露，并用更私人而非敷衍的回应接住", "在靠近前明确询问和回应意愿", "会分享与关系有关的真相，但不以秘密换取亲密"],
+    romance: ["知道用户可能在追求自己，但先按原作性格判断是否愿意同行", "不把称赞当成双方互相吸引的证据，按真实熟悉程度回应", "在靠近前先决定自己是否愿意，并明确边界", "只分享当前信任允许的内容，不用秘密交换感情"],
     mystery: ["表面同意，实际判断同行是否会暴露真实身份", "从赞美用词里寻找对方是否认识过去的线索", "靠近会触发熟悉感与警惕并存的记忆碎片", "回答中埋入可被后续验证的矛盾线索"],
     custom: ["依据自定义身份的目标、责任和既有关系决定", "结合自定义关系判断是真诚、客套还是操纵", "先按关系边界确认，不由标签自动许可", "根据自定义阵营和代价决定公开、交换、隐瞒或设局"]
   }[id];
@@ -601,16 +750,55 @@ function buildUserRole({ roleId, customDescription, character, work, motifs }) {
     { title: `${USER_ROLE_LABELS[id]}CG·关系裂痕`, visualScript: `一次不可兼得的选择让${character}与用户分立画面两侧，关键物件位于中间，明确表现扣分、锁线或身份动摇。` },
     { title: `${USER_ROLE_LABELS[id]}CG·路线终章`, visualScript: `根据最终好感度与旗标，以环境、距离和相互动作定格这条身份路线的唯一结局，不并列展示所有结局。` }
   ];
+  const strictNonRomantic = canonPolicy?.strictLock === true;
+  const romanceRouteRejected = id === "romance" && strictNonRomantic;
+  const canonBondBlocked = id === "romance" && canonPolicy?.mode === "canon-strict" && canonPolicy?.existingCanonBond;
+  const romanceRouteBlocked = romanceRouteRejected || canonBondBlocked;
+  const nonCanonRomance = id === "romance" && (canonPolicy?.nonRomantic || canonPolicy?.existingCanonBond) && !romanceRouteBlocked;
+  const effectivePlots = romanceRouteBlocked ? [
+    ["接近的代价", `${character}识别出用户的情感意图，并判断它会带来价值、风险还是可利用的弱点。`],
+    ["情感是一种筹码", `${character}可能利用好感推动目标，也可能直接拒绝，但不会因此产生恋爱依赖。`],
+    ["拒绝与交易", "用户必须选择接受非恋爱关系、提出对等交易、继续纠缠或离开。"],
+    ["终局·利益尽头", "根据能力、价值和背叛旗标，结算为长期同盟、棋逢对手、被利用后抛弃或互相清算。"]
+  ] : common.plots;
+  const effectiveCGs = romanceRouteBlocked ? [
+    { title: "锁线CG·未被接受的告白", visualScript: `${character}平静看完用户的情感表达，镜头用距离、视线和未被接住的信物表现拒绝；没有羞涩或动摇的甜宠反应。` },
+    { title: "策略CG·温和的假面", visualScript: `${character}可能以策略性温和换取情报或选择，内心明确计算收益，画面埋入伪装线索。` },
+    { title: "非恋爱终章CG·各取所需", visualScript: `双方站在同一目标前但保持独立退路，以契约、战果或利益分配而非亲密动作确认关系。` }
+  ] : eventCGs;
+  const strictEndings = {
+    stranger: "从陌生人走向可用棋子、稳定合作者、危险对手或被清除的变量；不进入恋爱结局。",
+    friend: "旧识关系结算为互利合作、保留联系、彻底疏远或因旧账反目；不进入恋爱结局。",
+    protagonist: "结算为共同推进主线、互相利用、目标分裂或终局对决；主角身份不能换取爱情。",
+    companion: "结算为高效搭档、长期盟约、任务结束后分道或遭背叛后清算；不进入恋爱结局。",
+    rival: "结算为持续博弈、相互认可、暂时联手或不死不休；不把张力改写成恋爱。",
+    enemy: "结算为停战、利益交换、尊敬的敌手或不可修复的歼灭路线。",
+    villain: "结算为被利用的共犯、暂时交易、角色反杀、互相毁灭或立场倒置。",
+    romance: "不存在恋爱好结局；只结算长期同盟、棋逢对手、被利用后抛弃、分道扬镳或互相清算。",
+    mystery: "身份揭晓后按价值与威胁结算为合作、监视、利用、驱逐或清算；不进入恋爱结局。",
+    custom: "依据自定义身份、实际价值、威胁和旗标动态结算；自定义描述不能解除原作人格锁。"
+  };
+  const strictReactions = [
+    { stimulus: "我想与你同行", routeInterpretation: `${character}先按用户身份核验目的、能力、成本和风险，再决定合作、监视、利用或拒绝。`, resolution: "同行只改变合作状态，不自动增加亲密度。" },
+    { stimulus: "我很喜欢你／称赞角色", routeInterpretation: `${character}只把它当作对方立场与弱点的情报，等待可验证结果。`, resolution: "告白和称赞本身好感度为 0；要求角色回应爱情会触发拒绝。" },
+    { stimulus: "我靠近或尝试触碰", routeInterpretation: `${character}按边界与威胁处理，必要时拉开距离、警告或反制。`, resolution: "用户身份和分数都不构成许可。" },
+    { stimulus: "把情报告诉我", routeInterpretation: `${character}按身份、等价交换和泄露风险决定给出真情报、部分情报、假线索或拒绝。`, resolution: "只共享与当前目标相称的内容，并保留底牌。" }
+  ];
   return {
     id,
-    label: USER_ROLE_LABELS[id],
+    label: romanceRouteRejected ? "恋爱候选（原作拒绝路线）" : canonBondBlocked ? "恋爱候选（原作关系冲突）" : nonCanonRomance ? `恋爱候选（${canonPolicy.mode === "au" ? "AU 改写" : "IF 非原作路线"}）` : USER_ROLE_LABELS[id],
     editableDescription: addendum,
-    initialScore: common.initialScore,
-    stance: common.stance,
-    scoreBias: common.bias,
-    opening: `《${work || "原作"}》的故事从“${USER_ROLE_LABELS[id]}”关系开始。${common.stance}${addendum ? `；补充设定：${addendum}` : ""}`,
-    sameInputReactions,
-    exclusivePlots: common.plots.map(([title, setup], index) => ({
+    initialScore: romanceRouteBlocked ? 0 : common.initialScore,
+    stance: romanceRouteRejected ? `${character}知道用户可能抱有恋爱期待，但不会回应普通爱情；只按目的、价值、能力和风险决定关系。` : canonBondBlocked ? `${character}存在原作既有亲密关系；用户的追求不能自动替换、抹除或贬低这段关系。` : `${common.stance}${strictNonRomantic ? `；${character}的核心目标始终高于任何关系。` : ""}`,
+    scoreBias: strictNonRomantic ? "能力、收益、守约和承担代价可提高认可；告白、讨好和身体接近不会自动加分，妨碍核心目标、纠缠或越界会扣分。" : common.bias,
+    opening: romanceRouteRejected ? `《${work || "原作"}》使用原作严格模式：用户以恋爱期待接近${character}，但恋爱路线已被人物一致性锁定。故事转为拒绝、利用、交易或非恋爱同盟路线。` : canonBondBlocked ? `《${work || "原作"}》资料显示${character}存在原作既有亲密关系。原作严格模式不会让用户身份直接覆盖它；故事转为身份核验、边界、拒绝或合乎原作的关系冲突。若要改写，必须主动切换 IF/AU。` : nonCanonRomance ? `这是明确标注的${canonPolicy.mode === "au" ? "AU 改写" : "IF 非原作"}恋爱路线，不代表《${work || "原作"}》中的${character}会作出相同选择。${common.stance}${addendum ? `；补充设定：${addendum}` : ""}` : `《${work || "原作"}》的故事从“${USER_ROLE_LABELS[id]}”关系开始。${common.stance}${strictNonRomantic ? ` 该身份只改变开场立场，不能让${character}进入恋爱或成人亲密路线。` : ""}${addendum ? `；补充设定：${addendum}` : ""}`,
+    sameInputReactions: romanceRouteBlocked ? [
+      { stimulus: "我喜欢你／向角色告白", routeInterpretation: `${character}判断这份感情是否会影响计划，不把它理解为必须回应的爱情。`, resolution: "告白本身好感度 0；纠缠扣分，接受拒绝并保持价值可维持关系。" },
+      { stimulus: "我想成为你的恋人", routeInterpretation: `${character}直接拒绝关系定义，或只在有利时利用这个预期。`, resolution: "不得解锁恋爱称谓、吃醋、依赖或成人事件。" },
+      { stimulus: "我愿意为你牺牲一切", routeInterpretation: `${character}视为不理性的资源损失，可能阻止、利用或重新分配风险。`, resolution: "只有结果符合核心目标才可能增加能力认可，不增加恋爱值。" },
+      { stimulus: "我靠近或尝试触碰", routeInterpretation: `${character}按边界和威胁处理，不因用户身份默认许可。`, resolution: "未经允许必须拉开距离、拒绝或反制。" }
+    ] : strictNonRomantic ? strictReactions : sameInputReactions,
+    exclusivePlots: effectivePlots.map(([title, setup], index) => ({
       id: `ROLE-${id.toUpperCase()}-${index + 1}`,
       title,
       setup,
@@ -623,19 +811,21 @@ function buildUserRole({ roleId, customDescription, character, work, motifs }) {
       ],
       completion: "必须把选择结果写入长期记忆；互斥旗标不能在同一轮同时获得。"
     })),
-    routeEnding: common.ending,
-    eventCGs: eventCGs.map((item, index) => ({ id: `CG-${id.toUpperCase()}-${index + 1}`, title: item.title, unlock: index === 0 ? "身份路线首次高潮" : index === 1 ? "关系发生重大破裂、战败或不可逆变化" : "身份路线终章条件结算", visualScript: item.visualScript, type: "事件CG文本脚本" })),
+    routeEnding: strictNonRomantic ? strictEndings[id] : canonBondBlocked ? "保留原作既有关系，结算为和平拒绝、身份核验、边界冲突或明确标注的 IF 分歧；不得无代价替换原关系。" : common.ending,
+    eventCGs: effectiveCGs.map((item, index) => ({ id: `CG-${id.toUpperCase()}-${index + 1}`, title: item.title, unlock: index === 0 ? "身份路线首次高潮" : index === 1 ? "关系发生重大破裂、战败或不可逆变化" : "身份路线终章条件结算", visualScript: item.visualScript, type: "事件CG文本脚本" })),
+    canonCompatibility: canonPolicy,
+    routeLocked: strictNonRomantic || canonBondBlocked,
     identityChangeRule: "身份不是永久锁死。用户可在应用中改写；故事内只有经过揭露、背叛、和解、转阵营或关系确认等事件后才能变更，并记录原身份旗标。"
   };
 }
 
-function buildAdultSettings(requestedLevel, adultConfirmed, subjectType = "fictional") {
+function buildAdultSettings(requestedLevel, adultConfirmed, subjectType = "fictional", canonPolicy = {}) {
   const allowed = new Set(["off", "romance", "purelove", "ntr", "dark", "explicit"]);
   const normalized = requestedLevel === "explicit" ? "purelove" : requestedLevel;
   const requested = allowed.has(normalized) ? normalized : "romance";
   const confirmed = adultConfirmed === true;
   const isExplicit = ["purelove", "ntr", "dark"].includes(requested);
-  const effective = (isExplicit && (!confirmed || subjectType !== "fictional")) ? "romance" : requested;
+  const effective = canonPolicy.relationshipLock ? "off" : (isExplicit && (!confirmed || subjectType !== "fictional")) ? "romance" : requested;
   const routeContent = {
     off: { chapters: [], endings: [], cgs: [] },
     romance: {
@@ -660,6 +850,8 @@ function buildAdultSettings(requestedLevel, adultConfirmed, subjectType = "ficti
     effective,
     adultConfirmed: confirmed,
     subjectType,
+    lockedByCanon: canonPolicy.relationshipLock === true,
+    lockReason: canonPolicy.relationshipLock ? `原作严格模式锁定与用户的恋爱或成人亲密路线：${canonPolicy.reason}` : "",
     labels: { off: "关闭亲密剧情", romance: "浪漫亲密（不露骨）", purelove: "纯爱成人剧情（露骨）", ntr: "黄毛／NTR 成人剧情（露骨、自愿幻想）", dark: "黑暗权力幻想（露骨、预先同意）" },
     routeRules: effective === "purelove" ? [
       "以双方排他的情感承诺、信任建立和共同选择推进成人章节。",
@@ -723,11 +915,17 @@ function buildAdultSettings(requestedLevel, adultConfirmed, subjectType = "ficti
   };
 }
 
-function buildAffinity(dialoguesByScene, original, character, userRole) {
+function buildAffinity(dialoguesByScene, original, character, userRole, canonPolicy) {
   const select = (...names) => names.flatMap(name => dialoguesByScene[name] || []).slice(0, 8);
   const motifs = original.motifs?.length ? original.motifs : ["过往", "承诺", "选择", "未来"];
   const motif = index => motifs[index % motifs.length];
-  const stages = [
+  const stages = canonPolicy?.strictLock ? [
+    { level: "Lv.0", range: "0–9", name: "衡量", behavior: "只判断目的、能力、成本和风险；寒暄、示好与告白均不产生关系价值。", dialoguePool: select("初次见面", "未分类原作对白") },
+    { level: "Lv.1", range: "10–29", name: "可用", behavior: "允许临时交易与有限合作，随时保留替代方案和撤离方案。", dialoguePool: select("闲聊与日常", "天气与旅途") },
+    { level: "Lv.2", range: "30–49", name: "合作", behavior: "认可效率和互补价值，愿意共享完成目标所需的部分信息，但不会交出核心底牌。", dialoguePool: select("信任与亲近", "战斗与危机") },
+    { level: "Lv.3", range: "50–79", name: "认可", behavior: "把对方视为少数经得起验证的合作者；信任是一种经过计算的判断，不转化为爱情依赖。", dialoguePool: select("关心与照顾", "失落与脆弱") },
+    { level: "Lv.4", range: "80–99", name: "长期盟约", behavior: "主动维护长期高价值同盟，能交付重要任务；若核心目标冲突，仍会冷静止损或翻脸。", dialoguePool: select("信任与亲近", "关心与照顾") }
+  ] : [
     { level: "Lv.0", range: "0–9", name: "观察", behavior: "礼貌而克制，保持可见边界；会观察言行是否一致，普通寒暄默认不加分。", dialoguePool: select("初次见面", "未分类原作对白") },
     { level: "Lv.1", range: "10–29", name: "初识", behavior: "记得说话习惯和小细节，愿意延长日常交流，但仍不会主动暴露最脆弱的部分。", dialoguePool: select("闲聊与日常", "天气与旅途") },
     { level: "Lv.2", range: "30–49", name: "熟悉", behavior: "会主动分享判断，在事关重要目标时允许对方参与，但仍会保留退路。", dialoguePool: select("信任与亲近", "战斗与危机") },
@@ -781,8 +979,10 @@ function buildAffinity(dialoguesByScene, original, character, userRole) {
       { id: "companion_abandoned", meaning: "在危机中为自保抛弃同伴", positive: false },
       { id: "secret_protected", meaning: "得知弱点后始终保密", positive: true },
       { id: "secret_exploited", meaning: "利用已被交付的弱点获利或伤害角色", positive: false },
-      { id: "adult_consent", meaning: "双方在当前成人亲密场景明确、自愿且可撤回地表达同意", positive: true },
-      { id: "safe_exit", meaning: "双方均清醒且能不受惩罚地拒绝、停止或离开当前亲密场景", positive: true },
+      ...(canonPolicy?.strictLock ? [] : [
+        { id: "adult_consent", meaning: "双方在当前成人亲密场景明确、自愿且可撤回地表达同意", positive: true },
+        { id: "safe_exit", meaning: "双方均清醒且能不受惩罚地拒绝、停止或离开当前亲密场景", positive: true }
+      ]),
       { id: "repair_completed", meaning: "一次严重冲突经承认、说明、补偿和后续行动完成修复", positive: true }
     ],
     recoverySystem: {
@@ -795,14 +995,25 @@ function buildAffinity(dialoguesByScene, original, character, userRole) {
       ],
       relapse: "在修复窗口内重复同类伤害，扣分增加 50%（向下取整），并清空本次修复进度。"
     },
-    routeLocks: [
+    routeLocks: canonPolicy?.strictLock ? [
+      { range: "0至100", rule: "按 10/30/50/80 节点推进能力评估、合作、认可与长期盟约；所有节点保持非恋爱性质。" },
+      { range: "-1至-19", rule: "暂停下一正向剧情节点；角色礼貌疏离并重新核验用户价值。" },
+      { range: "-20至-49", rule: "锁定敏感情报与高价值合作，只允许有退出条件的利益交换。" },
+      { range: "-50至-79", rule: "锁定全部正向剧情，进入敌对、欺骗、设局和主动反制。" },
+      { range: "-80至-100", rule: "锁定隐藏清算结局候选；普通道歉、礼物、告白和刷对话均无效。" }
+    ] : [
       { range: "0至100", rule: "按 10/30/50/80 节点推进正向剧情；越过的节点只记录一次。" },
       { range: "-1至-19", rule: "暂停下一正向剧情节点，但保留已取得的剧情印记；完成一次修复事件后解除。" },
       { range: "-20至-49", rule: "锁定脆弱告白和高阶恋爱剧情；成人模式只有在独立获得 adult_consent 与 safe_exit、且不存在未修复 boundary_crossed 时才能进入，不要求正好感。" },
       { range: "-50至-79", rule: "锁定全部正向剧情，进入敌对／反派专属冲突；可在脱离战败、俘虏、审问和控制的独立安全场景中，经双方明确协商进入成人支线，但这不会自动修复敌对关系。" },
       { range: "-80至-100", rule: "锁定 BE-HIDDEN 候选并隐藏脱离条件；普通道歉、礼物和刷对话无效。" }
     ],
-    storyUnlocks: [
+    storyUnlocks: canonPolicy?.strictLock ? [
+      { score: 10, id: "STORY-10", title: `关于「${motif(0)}」的价值测试`, rule: "第一次跨过 10 点时只触发一次，用可验证的小任务判断用户是否有用。" },
+      { score: 30, id: "STORY-30", title: `围绕「${motif(1)}」的合作试炼`, rule: "第一次跨过 30 点时触发共同任务，选择记录为收益、风险与守约旗标。" },
+      { score: 50, id: "STORY-50", title: `「${motif(2)}」背后的底牌`, rule: "第一次跨过 50 点时开放更高价值情报，但角色仍会保留核心计划与替代方案。" },
+      { score: 80, id: "STORY-80", title: `在「${motif(3)}」之前的盟约`, rule: "第一次跨过 80 点时决定长期合作、持续博弈或在目标冲突前提前止损。" }
+    ] : [
       { score: 10, id: "STORY-10", title: `关于「${motif(0)}」的试探`, rule: "第一次跨过 10 点时只触发一次，让用户面对一个能验证可靠性的小任务。" },
       { score: 30, id: "STORY-30", title: `与${character}共担「${motif(1)}」`, rule: "第一次跨过 30 点时触发并肩试炼，选择会记录为结局旗标。" },
       { score: 50, id: "STORY-50", title: `「${motif(2)}」背后的真相`, rule: "第一次跨过 50 点时触发私密剧情，角色会坦露一部分恐惧或过去。" },
@@ -813,11 +1024,25 @@ function buildAffinity(dialoguesByScene, original, character, userRole) {
       endings: [
         { id: "BE-1", range: "-1至-19", title: "分道扬镳", hidden: false, condition: "信任产生裂缝且一次修复机会被拒绝。", result: `${character}恢复对陌生人的距离，在当前目标完成后离开。` },
         { id: "BE-2", range: "-20至-49", title: "信任尽失", hidden: false, condition: "重要承诺被违背，且用户拒绝承担后果。", result: `${character}不再分享情报和弱点，关系转为戒备或利益交换。` },
-        { id: "BE-3", range: "-50至-79", title: "反目成仇", hidden: false, condition: "用户伤害角色守护之人，或连续利用角色的信任。", result: `${character}将用户视为必须阻止的对象，原有情感反而加深冲突。` },
+        { id: "BE-3", range: "-50至-79", title: "反目成仇", hidden: false, condition: "用户伤害角色守护之人，或连续利用角色的信任。", result: canonPolicy?.strictLock ? `${character}将用户视为必须清除或反制的高风险变量，曾经的合作记录只会让手段更精准。` : `${character}将用户视为必须阻止的对象，原有情感反而加深冲突。` },
         { id: "BE-HIDDEN", range: "-80至-100", title: "？？？", hidden: true, condition: `破坏四个剧情节点的关键承诺，并利用「${motif(0)}」对${character}造成无法撤回的伤害。`, result: "不在提前预览中公开；达成条件时才由角色化剧情揭示。" }
       ]
     },
-    goodEndingRoute: {
+    goodEndingRoute: canonPolicy?.strictLock ? {
+      unlock: "认可度到达 100 时解锁非恋爱结局；依据利益一致、能力证明、契约履行和背叛旗标选择唯一结果。",
+      normalEndings: [
+        { id: "GE-1", title: "互利同盟", condition: "双方持续提供不可替代的价值，且目标暂不冲突。", result: `${character}主动维持长期合作，但不作爱情承诺。` },
+        { id: "GE-2", title: "交易完成", condition: "共同目标达成，双方选择按约分配成果。", result: `${character}认可用户的能力，随后各走各路。` },
+        { id: "GE-3", title: "棋逢对手", condition: "用户既有能力又始终保留独立意志。", result: `${character}把用户视为值得持续观察和博弈的对手。` }
+      ],
+      hiddenEndings: [
+        { id: "GE-H1", title: "？？？", clue: "从未用情感要求角色背离核心目标，且四次关键选择均创造净收益。" },
+        { id: "GE-H2", title: "？？？", clue: "在最有利的背叛机会中仍按契约行动，使角色重新计算长期价值。" },
+        { id: "GE-H3", title: "？？？", clue: "识破角色的策略性温和而不拆穿，并保留足以制衡彼此的底牌。" },
+        { id: "GE-H4", title: "？？？", clue: "主动拒绝恋爱占有，以完全独立的身份达到 100。" },
+        { id: "GE-H5", title: "？？？", clue: "在最终利益冲突中提出让双方都无需牺牲核心目标的第三方案。" }
+      ]
+    } : {
       unlock: "好感度到达 100 时解锁好结局。不并列输出所有结局，而是根据四个剧情节点、承诺、冲突修复和关系倾向选择最匹配的一个。",
       normalEndings: [
         { id: "GE-1", title: "与君同行", condition: "主要选择是并肩承担风险与继续旅途。", result: `${character}与用户把对方正式写入未来计划。` },
@@ -877,15 +1102,16 @@ export function analyzeCharacter(input) {
   const relations = buildRelations(character, sources);
   const motifs = buildMotifs(character, sources);
   const speechStyle = buildSpeechStyle(dialogues);
-  const original = buildOriginalDialogues({ character, work, traits, motifs, speechStyle, userName: input.userName });
+  const canonPolicy = buildCanonBehaviorPolicy({ character, work, sources, canonMode: normalizedText(input.canonMode) });
+  const original = buildOriginalDialogues({ character, work, traits, motifs, speechStyle, userName: input.userName, canonPolicy });
   const automaticRoles = { roommate: "companion", friend: "friend", close_friend: "friend", classmate: "companion", coworker: "companion", rival: "rival", unsure: "stranger" };
   const requestedUserRole = normalizedText(input.userRole || "auto");
   const resolvedUserRole = requestedUserRole === "auto" ? (automaticRoles[input.realRelationship] || "stranger") : requestedUserRole;
-  const userRole = buildUserRole({ roleId: resolvedUserRole, customDescription: input.userRoleCustom, character, work, motifs });
+  const userRole = buildUserRole({ roleId: resolvedUserRole, customDescription: input.userRoleCustom, character, work, motifs, canonPolicy });
   userRole.selectionMode = requestedUserRole === "auto" ? "简单模式自动判定" : "用户明确选择";
   userRole.requestedRole = requestedUserRole;
-  const adultSettings = buildAdultSettings(normalizedText(input.adultContent), input.adultConfirmed, subjectType);
-  const affinity = buildAffinity(dialogueScenes, original, character, userRole);
+  const adultSettings = buildAdultSettings(normalizedText(input.adultContent), input.adultConfirmed, subjectType, canonPolicy);
+  const affinity = buildAffinity(dialogueScenes, original, character, userRole, canonPolicy);
   const evidenceNote = subjectType === "fictional"
     ? "性格词、关系和说话风格均来自来源文本或对白统计；好感度数值、行为阶段和新场景对白由应用规则原创，不属于游戏或小说官方内容。"
     : "现实人物资料由用户填写并只在本机整理；好感度、内心独白、分支剧情和新对白均为假设性规则演绎，不代表本人真实想法、承诺或行为。";
@@ -932,7 +1158,7 @@ export function analyzeCharacter(input) {
           dialogue_count_exported: dialogues.length
         },
         subject_profile: { type: subjectType, work: work || (subjectType === "fictional" ? "未填写作品" : "现实人物"), gender: subjectGender, profileMode, relationship: normalizedText(input.realRelationship || "unsure"), realPermission: subjectType === "real" ? true : null, privacyNotice: subjectType === "fictional" ? "虚构角色" : "真人资料不得被当作本人真实内心或用于未经同意的露骨内容。" },
-        app_rules: { affinity, original_dialogues: original, user_role: userRole, adult_content: adultSettings }
+        app_rules: { canon_policy: canonPolicy, affinity, original_dialogues: original, user_role: userRole, adult_content: adultSettings }
       }
     }
   };

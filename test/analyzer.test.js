@@ -127,6 +127,72 @@ test("supports simple and complex real-person profiles without explicit mode", (
   assert.throws(() => analyzeCharacter({ character: "室友", subjectType: "real" }), /本人同意/);
 });
 
+test("keeps Fang Yuan non-romantic in canon-strict mode even when romance is requested", () => {
+  const fangSource = {
+    title: "方源人物资料",
+    url: "https://example.com/fang-yuan",
+    text: `方源是《蛊真人》的主角。他执着于永生，以利益和目标衡量选择，冷酷果断，不让爱情成为束缚。\n方源：先谈条件，再决定是否同行。`
+  };
+  const card = analyzeCharacter({
+    work: "蛊真人", character: "方源", sources: [fangSource], userRole: "romance",
+    adultContent: "purelove", adultConfirmed: true, canonMode: "canon-strict"
+  });
+  const rules = card.data.extensions.app_rules;
+  const prompt = card.data.extensions.roleplay_prompt;
+  const serialized = serializeRoleplayPrompt(card);
+
+  assert.equal(rules.canon_policy.strictLock, true);
+  assert.equal(rules.user_role.label, "恋爱候选（原作拒绝路线）");
+  assert.equal(rules.user_role.initialScore, 0);
+  assert.equal(rules.user_role.routeLocked, true);
+  assert.equal(rules.adult_content.effective, "off");
+  assert.equal(rules.adult_content.lockedByCanon, true);
+  assert.deepEqual(rules.affinity.stages.map(item => item.name), ["衡量", "可用", "合作", "认可", "长期盟约"]);
+  assert.equal(rules.affinity.goodEndingRoute.normalEndings.length, 3);
+  assert.ok(rules.affinity.goodEndingRoute.normalEndings.every(item => !/恋|爱人|伴侣|甜蜜/.test(`${item.title}${item.result}`)));
+  assert.ok(rules.original_dialogues.scenes.flatMap(scene => scene.stages).flatMap(stage => stage.dialogues).every(item => !/恋人|爱上|想念|心愿/.test(item.text)));
+  assert.match(prompt.system_instruction["原作人格优先级"], /恋爱和成人路线已锁定/);
+  assert.equal(prompt.character_profile["成人剧情规则"]["启用"], false);
+  assert.match(serialized, /不创建堕落值、调教值、成人事件、恋爱结局或亲密结局/);
+  assert.doesNotMatch(serialized, /50 点只解锁角色主动询问/);
+
+  const friend = analyzeCharacter({ work: "蛊真人", character: "方源", sources: [fangSource], userRole: "friend", canonMode: "canon-strict" });
+  assert.equal(friend.data.extensions.app_rules.user_role.routeLocked, true);
+  assert.match(friend.data.extensions.app_rules.user_role.routeEnding, /不进入恋爱结局/);
+
+  const ifRoute = analyzeCharacter({ work: "蛊真人", character: "方源", sources: [fangSource], userRole: "romance", canonMode: "canon-if" });
+  assert.equal(ifRoute.data.extensions.app_rules.canon_policy.strictLock, false);
+  assert.match(ifRoute.data.extensions.app_rules.user_role.label, /IF 非原作路线/);
+});
+
+test("applies persona-first relationship gating to every character", () => {
+  const warmCard = analyzeCharacter({ work: "鸣潮", character: "秧秧", sources: [source], userRole: "romance", canonMode: "canon-strict" });
+  const warmRules = warmCard.data.extensions.app_rules;
+  assert.equal(warmRules.canon_policy.archetype, "warm");
+  assert.equal(warmRules.canon_policy.userRouteCannotSetFeelings, true);
+  assert.equal(warmRules.user_role.initialScore, 0);
+  assert.match(warmRules.user_role.stance, /尚未确定/);
+  assert.equal(warmRules.original_dialogues.relationshipMode, "canon_grounded");
+  const warmOriginal = warmRules.original_dialogues.scenes.flatMap(scene => scene.stages).flatMap(stage => stage.dialogues).map(item => item.text).join("\n");
+  assert.doesNotMatch(warmOriginal, /吃醋|爱上|恋人|抱住|每天醒来都还能看见/);
+  assert.match(warmRules.canon_policy.romanceGate, /初始不预设双方互相吸引/);
+
+  const bondedSource = {
+    title: "原作关系资料",
+    url: "https://example.com/bonded",
+    text: "角色甲性格谨慎克制。角色甲与角色乙是恋人和长期伴侣，两人共同承担使命。角色甲：不要急着相信陌生人。"
+  };
+  const bonded = analyzeCharacter({ work: "测试作品", character: "角色甲", sources: [bondedSource], userRole: "romance", adultContent: "purelove", adultConfirmed: true, canonMode: "canon-strict" });
+  assert.equal(bonded.data.extensions.app_rules.canon_policy.existingCanonBond, true);
+  assert.equal(bonded.data.extensions.app_rules.user_role.routeLocked, true);
+  assert.match(bonded.data.extensions.app_rules.user_role.label, /原作关系冲突/);
+  assert.equal(bonded.data.extensions.app_rules.adult_content.effective, "off");
+
+  const bondedIf = analyzeCharacter({ work: "测试作品", character: "角色甲", sources: [bondedSource], userRole: "romance", canonMode: "canon-if" });
+  assert.equal(bondedIf.data.extensions.app_rules.user_role.routeLocked, false);
+  assert.match(bondedIf.data.extensions.app_rules.user_role.label, /IF 非原作路线/);
+});
+
 test("rejects empty source set", () => {
   assert.throws(() => analyzeCharacter({ character: "秧秧" }), /至少添加一个/);
 });

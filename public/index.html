@@ -68,6 +68,13 @@
             </label>
             <label>身份补充 <span class="optional">可选</span><input id="user-role-custom" placeholder="例如：表面反派，实际在保护她"></label>
           </div>
+          <label>原作人格兼容
+            <select id="canon-mode">
+              <option value="canon-strict" selected>原作严格（推荐，角色不会被路线改写）</option>
+              <option value="canon-if">原作优先，允许 IF 非原作路线</option>
+              <option value="au">AU 自由改写（明确标注非原作）</option>
+            </select>
+          </label>
           <div id="real-profile-fields" class="profile-fields" hidden>
             <div class="field-grid two">
               <label>性别／称谓

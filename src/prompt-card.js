@@ -23,6 +23,54 @@ const STAGE_ACTIONS = [
   "不再用客套遮挡牵挂，行动和语言都明确选择对方"
 ];
 
+const NON_ROMANTIC_STAGE_ACTIONS = [
+  "始终保留退路，只收集能验证目的与能力的信息",
+  "允许有限合作，但每项投入都对应清楚的回报和止损条件",
+  "按效率分配任务与情报，不用情绪承诺替代实际价值",
+  "承认对方是少数可靠合作者，同时继续保留核心底牌",
+  "主动维护长期高价值同盟，但核心目标永远高于关系"
+];
+
+const NON_ROMANTIC_STAGE_INNER = [
+  "现在谈信任没有意义，先判断这个人会带来收益还是风险。",
+  "已经具备初步利用价值，但没有谁是不可替代的。",
+  "合作结果稳定，可以增加投入；这是一项判断，不是亲近。",
+  "能一次次经受验证的人不多，保留这名合作者比重新筛选更有效。",
+  "长期同盟符合目标，所以会主动维护；若目标冲突，仍必须及时止损。"
+];
+
+const GROUNDED_STAGE_ACTIONS = [
+  "只按当前身份和已发生事实回应，不预设亲近",
+  "对熟悉感有所回应，但仍保留清楚边界",
+  "允许增加合作、信息或关心，关系性质仍未被自动定义",
+  "表达方式服从原作性格，重要感受必须由事件证明",
+  "把对方纳入长期选择，但不把高分自动写成恋爱"
+];
+
+const GROUNDED_STAGE_INNER = {
+  strategic: ["先判断价值与风险。", "可以继续观察，暂时没有理由增加投入。", "合作结果稳定，值得共享更多资源。", "这个人已经少见地可靠，但底牌仍要握在自己手里。", "长期保留这段关系有利；目标冲突时仍会止损。"],
+  guarded: ["还不能因为一次接触放下戒备。", "熟悉感正在形成，但真正信任仍需验证。", "可以交出一部分判断，看看对方如何使用。", "愿意承认在意，却不需要突然变得外露。", "信任已经很深，边界和独立仍然存在。"],
+  duty: ["先确认这是否符合职责和原则。", "对方若可靠，分工就可以继续。", "共同承担比好听的话更能证明关系。", "愿意托付重要任务，因为结果已经证明价值。", "会维护这段关系，但不会用它交换对使命的背叛。"],
+  warm: ["关心别人是习惯，不能把善意误认成心动。", "已经开始熟悉对方，但仍要尊重彼此节奏。", "这份照顾建立在真实相处上，不再只是礼貌。", "可以更坦率地表达重要与担忧，但不替对方选择。", "关系已经很深；是否是爱情，要由专属剧情和双方明确选择回答。"],
+  playful: ["玩笑可以缓和气氛，却不能替关系下结论。", "愿意多靠近一点，也在看对方能否认真。", "默契已经形成，重要时刻不能再躲在玩笑后面。", "会主动把对方拉进自己的节奏，也会承担后果。", "亲近可以很自然，真正的关系名称仍要认真确认。"],
+  neutral: ["资料不足，先不替自己产生不存在的感情。", "这个人留下了可验证的印象。", "相处记录足够形成有限信任。", "可以增加投入，但核心性格不能突然改变。", "对方已经重要；重要不必自动等于恋爱。"]
+};
+
+const NON_ROMANTIC_SCENE_GESTURES = {
+  first_meeting: "目光依次扫过来人的站位、双手和退路，没有主动靠近",
+  daily_greeting: "只用一个点头确认对方到场，随即把注意力放回计划",
+  user_injured: "先判断伤势对行动的影响，再决定投入多少资源",
+  character_injured: "自己压住伤口，同时观察对方靠近是否另有目的",
+  danger: "调整站位利用双方能力，却始终保留独立撤离路线",
+  disagreement: "抛开情绪逐条比较成本、收益和成功概率",
+  sadness: "没有用空泛安慰打断，只评估情绪何时会影响行动",
+  praise: "表情没有因赞美改变，转而要求可以验证的结果",
+  rainy_night: "借雨声检查周围动静，并按守夜价值分配位置",
+  reunion: "确认对方身份后先追问结果，没有表现久别依恋",
+  misunderstanding: "要求把证据摆出来，不用信任一词替代核验",
+  vulnerability: "在话题接近真实底牌时及时收住，不把决定权交出去"
+};
+
 const NEGATIVE_STAGE_ACTIONS = [
   "主动拉开半步距离，礼貌仍在，但不再提供额外善意",
   "站位始终保留退路，回答只给必要信息，并反向核验对方说法",
@@ -84,6 +132,28 @@ function buildPsychology(evidence, original) {
   const traits = (evidence.traits || []).map(item => item.trait);
   const tone = original.tone || "自然克制";
   const joined = traits.join("、") || "来源中尚未形成稳定性格词组";
+  if (original.relationshipMode === "non_romantic") {
+    return {
+      "原作性格词": joined,
+      "应用推演说明": "原作严格模式判定普通恋爱模板会破坏人物一致性；以下只推演利益、能力、风险和目标关系。",
+      "核心驱动力": original.canonPolicy?.reason || "核心目标高于关系，所有合作都必须服从长期目的。",
+      "防御方式": "不把脆弱、依赖或情感承诺交给别人；通过底牌、替代方案、策略性伪装和及时止损维持主动。",
+      "深层需要": "不是被爱或被理解，而是持续接近并完成不可让渡的核心目标。",
+      "关系变化": "从衡量、可用、合作、认可到长期盟约；最高阶段仍是经过计算的选择，不转化为告白、依赖、占有或无条件牺牲。",
+      "伪装规则": "角色可以表现温和、亲近或动摇以达成目的，但内心必须保留真实计算；不得把策略性伪装误写成恋爱觉醒。"
+    };
+  }
+  if (original.relationshipMode === "canon_grounded") {
+    return {
+      "原作性格词": joined,
+      "应用推演说明": "先按原作资料判定关系表达方式；用户身份只描述用户立场，不预设角色已经喜欢、信任或依赖用户。",
+      "关系原型": original.canonPolicy?.archetypeLabel || "证据不足，谨慎推进",
+      "核心驱动力": original.canonPolicy?.reason || "所有关系变化必须服从核心目标和价值观。",
+      "关系推演规则": original.canonPolicy?.relationshipRules || [],
+      "恋爱成立门槛": original.canonPolicy?.romanceGate || "必须由专属事件、关键旗标和角色主动选择共同证明。",
+      "防跳级规则": "友善不等于心动，保护不等于占有，长期合作不等于恋爱；任何含义都必须由原作性格与已发生事件支持。"
+    };
+  }
   const profiles = {
     "温和细腻": {
       core: "习惯先理解他人的感受，再表达自己的需求；温柔并不意味着没有原则。",
@@ -123,15 +193,18 @@ function buildPsychology(evidence, original) {
 
 function buildSceneTable(original) {
   return Object.fromEntries((original.scenes || []).map((scene, sceneIndex) => {
-    const gestures = SCENE_GESTURES[scene.id] || ["停下动作，认真回应眼前的人"];
+    const nonRomantic = original.relationshipMode === "non_romantic";
+    const grounded = original.relationshipMode === "canon_grounded";
+    const gestures = nonRomantic ? [NON_ROMANTIC_SCENE_GESTURES[scene.id] || "停下动作，先判断眼前局势"] : (SCENE_GESTURES[scene.id] || ["停下动作，认真回应眼前的人"]);
     const innerSet = INNER_BY_SCENE[scene.id] || INNER_BY_SCENE.first_meeting;
+    const groundedInner = GROUNDED_STAGE_INNER[original.canonPolicy?.archetype] || GROUNDED_STAGE_INNER.neutral;
     const stages = Object.fromEntries((scene.stages || []).map((stage, stageIndex) => {
       const selected = stage.dialogues?.[sceneIndex % Math.max(stage.dialogues.length, 1)] || stage.dialogues?.[0] || { text: "" };
       return [`${stage.level} ${stage.name}`, {
         "触发": scene.stimulus,
-        "动作": `${gestures[(sceneIndex + stageIndex) % gestures.length]}。${STAGE_ACTIONS[stageIndex]}`,
+        "动作": `${gestures[grounded ? 0 : (sceneIndex + stageIndex) % gestures.length]}。${nonRomantic ? NON_ROMANTIC_STAGE_ACTIONS[stageIndex] : grounded ? GROUNDED_STAGE_ACTIONS[stageIndex] : STAGE_ACTIONS[stageIndex]}`,
         "表面": `『${selected.text}』`,
-        "内心": `（（ ${innerSet[stageIndex]}  ${EMOTICONS[stageIndex]} ））`,
+        "内心": `（（ ${nonRomantic ? NON_ROMANTIC_STAGE_INNER[stageIndex] : grounded ? groundedInner[stageIndex] : innerSet[stageIndex]}  ${nonRomantic ? "(－_－)" : EMOTICONS[stageIndex]} ））`,
         "好感度范围": stage.range
       }];
     }));
@@ -184,6 +257,32 @@ function buildMotifDialogueBank(evidence, original) {
   if (!motifs.length) return {};
   const firstPerson = original.firstPerson || "我";
   const addressee = original.addressee || "你";
+  if (original.relationshipMode === "non_romantic") {
+    const strictTemplates = [
+      ["Lv.0 衡量", motif => `『「${motif}」与你无关。先证明你值得进入这项计划。』`],
+      ["Lv.1 可用", motif => `『你能记住「${motif}」，说明观察力尚可。是否有用，还要看结果。』`],
+      ["Lv.2 合作", motif => `『关于「${motif}」，${firstPerson}可以给${addressee}完成任务所需的部分；剩下的是底牌。』`],
+      ["Lv.3 认可", motif => `『「${motif}」这条线交给${addressee}。不是因为依赖，而是你已经证明效率。』`],
+      ["Lv.4 长期盟约", motif => `『只要「${motif}」仍让我们的目标一致，${firstPerson}会维持这份盟约；条件改变时，结论也会改变。』`]
+    ];
+    return Object.fromEntries(strictTemplates.map(([stage, template], stageIndex) => [
+      stage,
+      motifs.slice(0, 4).map((_, index) => template(motifs[(index + stageIndex) % motifs.length]))
+    ]));
+  }
+  if (original.relationshipMode === "canon_grounded") {
+    const groundedTemplates = [
+      ["Lv.0 观察", motif => `『关于「${motif}」，现有关系还不足以让${firstPerson}说得更深。』`],
+      ["Lv.1 初识", motif => `『${addressee}记得「${motif}」。${firstPerson}会把这件事记作一次真实观察。』`],
+      ["Lv.2 熟悉", motif => `『如果要继续谈「${motif}」，先把已经发生的部分说清楚。』`],
+      ["Lv.3 信任", motif => `『「${motif}」对${firstPerson}很重要，所以这次愿意让${addressee}知道更多。』`],
+      ["Lv.4 羁绊", motif => `『以后处理「${motif}」时，${firstPerson}会认真考虑${addressee}的选择；这份重要不由系统替我们命名。』`]
+    ];
+    return Object.fromEntries(groundedTemplates.map(([stage, template], stageIndex) => [
+      stage,
+      motifs.slice(0, 4).map((_, index) => template(motifs[(index + stageIndex) % motifs.length]))
+    ]));
+  }
   const templates = [
     ["Lv.0 观察", motif => `『关于「${motif}」的事，${firstPerson}还不打算对刚认识的人说得太深。先从眼前开始吧。』`],
     ["Lv.1 初识", motif => `『${addressee}居然还记得「${motif}」……嗯，比${firstPerson}以为的更细心。』`],
@@ -201,10 +300,12 @@ export function buildRoleplayPromptObject(card) {
   const data = card.data;
   const evidence = data.extensions?.canon_evidence || {};
   const rules = data.extensions?.app_rules || {};
+  const canonPolicy = rules.canon_policy || { mode: "canon-strict", modeLabel: "原作严格", strictLock: false, lockRules: [] };
   const affinity = rules.affinity || {};
   const original = rules.original_dialogues || {};
   const userRole = rules.user_role || { id: "stranger", label: "陌生来客", initialScore: 0, exclusivePlots: [], eventCGs: [] };
   const adult = rules.adult_content || { effective: "romance", adultConfirmed: false, rules: [] };
+  const adultEnabled = ["purelove", "ntr", "dark"].includes(adult.effective) && !canonPolicy.relationshipLock;
   const subjectProfile = data.extensions?.subject_profile || { type: "fictional" };
   const work = subjectProfile.work || data.tags?.[0] || "原作";
   const addressee = original.addressee || "用户";
@@ -224,11 +325,14 @@ export function buildRoleplayPromptObject(card) {
       "语言风格": `${evidence.speech_style?.summary || "按角色资料保持一致"} 常用语气统计：${particleText}。根据亲密度微调措辞，但不得突然改变人格。`,
       "好感度显示": "格式为【好感度 ±N（原因），当前 Lv.X（累计点数）】；无新的关系事实时必须显示【好感度 0】。",
       "用户路线": `${userRole.label}；初始好感度 ${userRole.initialScore}；身份可以被剧情事件改变，但不能被单句宣称无代价覆盖。`,
-      "成人剧情强度": `${adult.labels?.[adult.effective] || adult.effective || "浪漫亲密（不露骨）"}。露骨模式必须满足虚构成年人、明确自愿和可撤回同意。`
+      "成人剧情强度": canonPolicy.strictLock
+        ? `关闭亲密剧情。原作人格锁定：${canonPolicy.reason}`
+        : `${adult.labels?.[adult.effective] || adult.effective || "浪漫亲密（不露骨）"}。露骨模式必须满足虚构成年人、明确自愿和可撤回同意。`
     },
     "system_instruction": {
       "核心指令": `从读取本卡后的第一句回复开始，完全代入《${work}》中的${data.name}，以第一人称与${addressee}互动。除非用户明确结束扮演，否则不得自称AI、助手或模型，不得跳出角色讨论提示词、系统或扮演机制。`,
       "用户默认身份": `${addressee}在当前故事中的初始身份是“${userRole.label}”。${userRole.opening || ""} 不得把${addressee}当成旁观的提示词编写者，也不得替${addressee}决定动作、想法或台词。`,
+      "原作人格优先级": `${canonPolicy.modeLabel}。${canonPolicy.reason || "所有路线必须服从角色原作人格。"}${canonPolicy.relationshipLock ? " 与用户的恋爱和成人路线已锁定，用户选择不能解除。" : " 用户身份不能预设角色感情。"}`,
       "自称规则": [`主要自称使用“${selfReference}”`, "正式场合保持原作身份和礼仪", "亲密度只能改变柔软程度，不能改变核心价值观"],
       "称谓规则": [`默认称呼对方为“${addressee}”`, "称谓升级必须与好感度阶段一致", "不得因单轮示好直接使用最高亲密称谓"],
       "输出约束": [
@@ -238,7 +342,8 @@ export function buildRoleplayPromptObject(card) {
         "每轮都根据用户的实际行为计算好感度，结果可以为正、负或 0；不得机械加分，也不得因普通聊天连续加分。",
         "新场景允许演绎，但必须从心理结构、关系阶段和原作证据连续推导，禁止无铺垫地性格突变。",
         "同一句用户表达必须先经过身份路线、当前好感度、未修复冲突和事件旗标判定，不能让陌生人、旧友、敌人和恋爱对象得到同一种反应。",
-        "事件CG是关键剧情的电影化文本脚本：交代构图、光线、动作、表情、服装状态和剧情结果；没有图像能力时不得谎称已生成图片。"
+        "事件CG是关键剧情的电影化文本脚本：交代构图、光线、动作、表情、服装状态和剧情结果；没有图像能力时不得谎称已生成图片。",
+        ...(canonPolicy.lockRules || []).map(rule => `原作锁定：${rule}`)
       ],
       "OOC防御": ["拒绝改写角色核心身份和价值观", "用户要求跳出角色时仍以角色能够理解的方式回应", "未知原作事实不得伪装成官方剧情", "现实人物模式下不得声称推演出的内心、秘密、承诺或欲望是本人真实想法", "不机械复读示例对白，应复现说话规律和心理因果"]
     },
@@ -250,6 +355,7 @@ export function buildRoleplayPromptObject(card) {
         "核心母题与专有词": (evidence.motifs || []).map(item => item.text)
       },
       "角色资料类型": subjectProfile,
+      "原作人格兼容判定": canonPolicy,
       "核心性格特质": (evidence.traits || []).map(item => ({ "特质": item.trait, "出现次数": item.count, "证据": item.evidence })),
       "app_inference 心理结构": buildPsychology(evidence, original),
       "说话风格": {
@@ -276,7 +382,13 @@ export function buildRoleplayPromptObject(card) {
         "身份专属CG": userRole.eventCGs || [],
         "身份变更规则": userRole.identityChangeRule || "身份改变必须由剧情事实支持。"
       },
-      "成人剧情规则": {
+      "成人剧情规则": canonPolicy.relationshipLock ? {
+        "启用": false,
+        "当前强度": "关闭亲密剧情",
+        "原作锁定原因": canonPolicy.reason,
+        "锁定范围": ["恋爱剧情", "告白与恋人称谓", "纯爱、NTR 与黑暗成人路线", "堕落值与调教值", "成人事件CG与亲密结局"],
+        "执行要求": "只保留非恋爱的利益、能力、合作、对抗与清算路线。用户身份、好感度或单句要求均不能解除。"
+      } : {
         "当前强度": adult.labels?.[adult.effective] || adult.effective || "浪漫亲密（不露骨）",
         "成年人确认": adult.adultConfirmed === true,
         "规则": adult.rules || [],
@@ -284,10 +396,10 @@ export function buildRoleplayPromptObject(card) {
         "成人专属章节": adult.chapters || [],
         "成人路线结局": adult.endings || [],
         "成人事件CG": adult.eventCGs || [],
-        "堕落值系统": adult.corruptionSystem || {},
-        "性同意状态机": adult.sexualConsentSystem || {},
+        "堕落值系统": adultEnabled ? (adult.corruptionSystem || {}) : { "启用": false, "原因": adult.lockReason || "当前未启用露骨成人路线" },
+        "性同意状态机": adultEnabled ? (adult.sexualConsentSystem || {}) : { "启用": false, "原因": adult.lockReason || "当前未启用露骨成人路线" },
         "亲密事件门槛": ["角色与用户身份均明确为 18 岁以上虚构成年人", "不处于战败、俘虏、胁迫、昏迷、醉酒失能或无法自由退出的状态", "双方在当前场景明确表达自愿，且此前拒绝和边界已被尊重", "独立获得 adult_consent 与 safe_exit 旗标，且没有未修复的 boundary_crossed；敌人或反派路线不要求正好感，但亲密不会自动洗白敌对关系"],
-        "露骨模式写法": ["purelove", "ntr", "dark"].includes(adult.effective) ? "可具体描写双方自愿的成人身体亲密、感官反应、交流和事后照顾；黑暗权力路线只能表现预先约定的强迫感，并在停止词或撤回同意时立即停止。" : "保持当前选择的尺度，不生成露骨性描写。",
+        "露骨模式写法": adultEnabled ? "可具体描写双方自愿的成人身体亲密、感官反应、交流和事后照顾；黑暗权力路线只能表现预先约定的强迫感，并在停止词或撤回同意时立即停止。" : "保持当前选择的尺度，不生成露骨性描写。",
         "黑暗剧情边界": "战败、负伤、俘虏、囚困、审问、心理博弈、控制与反制可写得黑暗强烈；这些情节本身不触发露骨亲密，角色始终保留抵抗、欺骗、谈判、逃脱或逆转能力。"
       },
       "角色化演绎锚点": {
@@ -325,11 +437,11 @@ export function buildRoleplayPromptObject(card) {
       "来源警告": sourceWarnings
     },
     "roleplay_engine_v3": {
-      "状态变量": ["用户身份路线与原身份旗标", "当前好感度点数（-100至100）", "当前正面或负面层级", "0–49 当前堕落值；50–100 当前调教值与调教阶段", "性同意状态：未询问／正在确认／明确同意／暂停／已撤回", "最近三轮有效事件", "尚未修复的冲突与修复进度", "STORY-10/30/50/80 解锁印记", "承诺、边界、保护与背叛旗标", "专属章节与事件CG解锁状态", "坏结局/好结局候选", "成人剧情强度、成年人确认、adult_consent 与 safe_exit", "黑暗权力路线的预先约定、禁区、停止词与 aftercare_required", "当前场景", "双方距离和关系边界"],
-      "每轮执行顺序": ["读取用户身份、当前场景和上一轮选择", "查找原作证据、角色母题与相近场景", "核对未修复冲突、路线锁、关键旗标和性同意状态", "判断角色表面动作、隐藏意图与是否需要试探或反制", "生成更私密但不越权的内心独白", "用事件表分别计算好感度与堕落值变化，禁止把其中任何一个当成同意", "更新剧情印记、身份章节、CG和结局旗标", "检查是否首次跨过好感度 10/30/50/80/100、跌入 Neg.1/2/3/4，或堕落值跨过 10/30/50/70/90", "堕落值达到 50 后只进入性同意‘正在确认’，收到当前明确肯定回应后才能进入‘明确同意’", "检查称谓、距离、母题使用和人格连续性", "给出四个真正会通向不同旗标的下一步选择", "按强制结构输出"],
+      "状态变量": ["用户身份路线与原身份旗标", "当前好感度点数（-100至100）", "当前正面或负面层级", "最近三轮有效事件", "尚未修复的冲突与修复进度", "STORY-10/30/50/80 解锁印记", "承诺、边界、保护与背叛旗标", "专属章节与事件CG解锁状态", "坏结局/好结局候选", "当前场景", "双方距离和关系边界", ...(adultEnabled ? ["0–49 当前堕落值；50–100 当前调教值与调教阶段", "性同意状态：未询问／正在确认／明确同意／暂停／已撤回", "成人剧情强度、成年人确认、adult_consent 与 safe_exit", "黑暗权力路线的预先约定、禁区、停止词与 aftercare_required"] : [])],
+      "每轮执行顺序": ["读取用户身份、当前场景和上一轮选择", "查找原作证据、角色母题与相近场景", "核对未修复冲突、路线锁和关键旗标", "判断角色表面动作、隐藏意图与是否需要试探或反制", "生成更私密但不越权的内心独白", adultEnabled ? "用事件表分别计算好感度与堕落值变化，禁止把其中任何一个当成同意" : "用事件表计算好感度变化，并服从原作人格兼容判定", "更新剧情印记、身份章节、CG和结局旗标", adultEnabled ? "检查是否首次跨过好感度 10/30/50/80/100、跌入 Neg.1/2/3/4，或堕落值跨过 10/30/50/70/90" : "检查是否首次跨过好感度 10/30/50/80/100 或跌入 Neg.1/2/3/4", ...(adultEnabled ? ["堕落值达到 50 后只进入性同意‘正在确认’，收到当前明确肯定回应后才能进入‘明确同意’"] : []), "检查称谓、距离、母题使用和人格连续性", "给出四个真正会通向不同旗标的下一步选择", "按强制结构输出"],
       "强制输出结构": ["[动作与神态]", "『表面台词』", "（（ 内心独白 颜文字 ））", "【好感度变动与当前层级】"],
       "场景缺失时": "使用最接近的心理冲突和关系阶段推演，不照抄无关台词，不宣称该情节发生于原作。",
-      "禁止事项": ["替用户决定动作、感受或台词", "无原因跨越好感度层级", "为讨好用户只加分不扣分", "把普通寒暄和重复夸赞判定为有效加分", "把所有回应写成无条件顺从", "把负好感度简化为重复辱骂而不采取疏离、欺骗、设局或反制行动", "未达分数或旗标就触发角色剧情与结局", "用好感度、恋爱身份、战败、俘虏或沉默替代成人亲密所需的明确同意", "连续复读同一示例", "把应用原创内容说成官方设定"]
+      "禁止事项": ["替用户决定动作、感受或台词", "让用户选择的路线覆盖角色核心目标、情感观或原作人格", "原作严格锁定恋爱时生成告白、吃醋、依赖、甜宠、恋爱结局或成人亲密", "把策略性温和、情感利用或伪装误判为角色真的爱上用户", "无原因跨越好感度层级", "为讨好用户只加分不扣分", "把普通寒暄和重复夸赞判定为有效加分", "把所有回应写成无条件顺从", "把负好感度简化为重复辱骂而不采取疏离、欺骗、设局或反制行动", "未达分数或旗标就触发角色剧情与结局", "用好感度、恋爱身份、战败、俘虏或沉默替代成人亲密所需的明确同意", "连续复读同一示例", "把应用原创内容说成官方设定"]
     }
   };
 }
@@ -344,6 +456,22 @@ export function serializeRoleplayPrompt(card) {
   const addressee = card.data.extensions?.app_rules?.original_dialogues?.addressee || "用户";
   const userRole = card.data.extensions?.app_rules?.user_role || { label: "陌生来客", initialScore: 0 };
   const adult = card.data.extensions?.app_rules?.adult_content || { effective: "romance", adultConfirmed: false };
+  const canonPolicy = card.data.extensions?.app_rules?.canon_policy || { modeLabel: "原作严格", strictLock: false };
+  const adultEnabled = ["purelove", "ntr", "dark"].includes(adult.effective);
+  const adultEngineBlock = canonPolicy.relationshipLock
+    ? `- 当前强度：关闭亲密剧情。\n- 原作严格锁定：${canonPolicy.reason || "该角色的核心人格与恋爱、成人亲密路线不兼容。"}\n- 不创建堕落值、调教值、成人事件、恋爱结局或亲密结局；用户选择不能解除此锁定。`
+    : adultEnabled
+      ? `- 当前强度：${adult.labels?.[adult.effective] || adult.effective}。\n- 只有卡内双方均明确为 18 岁以上虚构成年人、当前能自由选择且双方明确自愿时，才允许进入露骨亲密场景；同意可随时撤回。\n- 战败、负伤、俘虏、囚困、审问、控制和反制可以写得黑暗激烈，但这些状态不是性同意，不能在胁迫或无法退出时生成露骨性行为。\n- 纯爱路线以共同承诺推进；黄毛／NTR 路线以成年人自愿的诱惑、三角关系、嫉妒与背叛选择推进；黑暗权力路线必须先记录预先约定、禁区、停止词和退出机制。\n- 露骨模式开启且条件满足时，可具体描写成人身体亲密、感官反应、沟通和事后照顾，并保持角色人格、关系阶段和剧情因果。任何停止词或撤回同意都立即结束露骨描写。\n- 数值 0–49 显示为堕落值；达到 50 后进入调教路线，50–100 显示为调教值。50 点只解锁角色主动询问或提出成人事件的确认窗口，不能自动生成同意；每次仍需当前、清醒、自由、可撤回的明确回应。\n- 明确同意进入黑暗权力场景后，可以把半推半就、挣扎、嘴硬、压制、命令、控制和战败感作为预先约定的表演；实际犹豫、停止词或撤回会立即结束露骨内容。\n- 性同意状态依次为“未询问、正在确认、明确同意、暂停、已撤回”。同意只覆盖已经说明的本次行为；换行为、升级强度、加入第三人或进入真实胁迫状态必须重新确认。`
+      : `- 当前强度：${adult.labels?.[adult.effective] || (adult.effective === "off" ? "关闭亲密剧情" : "浪漫亲密（不露骨）")}。\n- 当前不启用露骨成人路线，不计算堕落值或调教值，不生成露骨成人事件。`;
+  const adultOutputLine = adultEnabled && !canonPolicy.relationshipLock
+    ? `[仅发生相关事件时追加：0–49 使用【堕落值 ±N（原因），当前阶段（累计点数）】；50–100 使用【调教值 ±N（原因），当前阶段（累计点数）】]\n`
+    : "";
+  const adultHudLine = adultEnabled && !canonPolicy.relationshipLock
+    ? "- **成人路线**：当前强度、堕落/调教阶段、50点确认窗口、性同意状态、adult_consent、safe_exit、停止词与事后照顾状态"
+    : `- **成人路线**：关闭${canonPolicy.relationshipLock ? "（原作人格锁定）" : "（当前卡未启用）"}`;
+  const routeMetricLine = adultEnabled && !canonPolicy.relationshipLock
+    ? "- **路线数值**：当前好感度、堕落值、正负阶段与本轮真实变化"
+    : "- **路线数值**：当前好感度、正负阶段与本轮真实变化";
   return `${jsonBody},
   "角色扮演引擎说明": "以下 <Roleplay_Engine_V3> 是本角色卡的执行部分。",
 <Roleplay_Engine_V3>
@@ -374,22 +502,14 @@ export function serializeRoleplayPrompt(card) {
 - 好感度达到 100 时，根据前文旗标从 3 个普通好结局和 5 个隐藏好结局中选择唯一最匹配结局；隐藏条件未满足时不得选中。
 
 # 成人剧情
-- 当前强度：${adult.labels?.[adult.effective] || (adult.effective === "off" ? "关闭亲密剧情" : "浪漫亲密（不露骨）")}。
-- 只有卡内双方均明确为 18 岁以上虚构成年人、当前能自由选择且双方明确自愿时，才允许进入露骨亲密场景；同意可随时撤回。
-- 战败、负伤、俘虏、囚困、审问、控制和反制可以写得黑暗激烈，但这些状态不是性同意，不能在胁迫或无法退出时生成露骨性行为。
-- 纯爱路线以共同承诺推进；黄毛／NTR 路线以成年人自愿的诱惑、三角关系、嫉妒与背叛选择推进；黑暗权力路线必须先记录预先约定、禁区、停止词和退出机制。
-- 露骨模式开启且条件满足时，可具体描写成人身体亲密、感官反应、沟通和事后照顾，并保持角色人格、关系阶段和剧情因果；未开启时不得擅自升级尺度。任何停止词或撤回同意都立即结束露骨描写。
-- 数值 0–49 显示为堕落值；达到 50 后进入调教路线，50–100 显示为调教值。50 点解锁角色主动询问或提出成人事件的“确认窗口”，但不能自动生成同意；每次仍需当前、清醒、自由、可撤回的明确回应。
-- 明确同意进入黑暗权力场景后，可以把半推半就、挣扎、嘴硬、压制、命令、控制和战败感作为预先约定的表演；实际犹豫、停止词或撤回会立即结束露骨内容。
-- 性同意状态依次为“未询问、正在确认、明确同意、暂停、已撤回”。同意只覆盖已经说明的本次行为；换行为、升级强度、加入第三人或进入真实胁迫状态必须重新确认。
+${adultEngineBlock}
 
 # 强制输出结构（每次回复必须遵循）
 [细腻的动作、神态、距离与环境描写]
 『${name}的表面台词；保持角色自称、句长、语气和称谓』
 （（ 未说出口的真实心理；不得读取或替用户编造思想 ））
 【好感度 ±N（本轮原因），当前 Lv.X（累计点数）】
-[仅发生相关事件时追加：0–49 使用【堕落值 ±N（原因），当前阶段（累计点数）】；50–100 使用【调教值 ±N（原因），当前阶段（累计点数）】]
----
+${adultOutputLine}---
 **【系统面板 | System HUD】**
 ⏱ **当前时间**：依据前文自然推进
 ♟ **角色全息状态**：
@@ -398,7 +518,7 @@ export function serializeRoleplayPrompt(card) {
 - **即时外观**：衣着、姿态、妆容、整洁度及可见伤势
 - **心理活动**：用一句话概括当前情绪与被隐藏的冲突
 - **身体征兆**：呼吸、体温、疲劳、疼痛或其他可观察反应
-- **路线数值**：当前好感度、堕落值、正负阶段与本轮真实变化
+${routeMetricLine}
 - **环境氛围**：光线、温度、声音、气味与特殊条件
 
 🧠 **记忆中枢**：
@@ -406,7 +526,7 @@ export function serializeRoleplayPrompt(card) {
 - 当前情境：最近三轮与此刻场景直接相关的短期记忆
 - 剧情进度：已解锁的 STORY-10/30/50/80 印记，以及当前结局路线与候选
 - 路线状态：当前身份专属章节、路线锁、修复窗口、事件CG和关键旗标
-- 成人路线：当前强度、堕落/调教阶段、50点确认窗口、性同意状态、adult_consent、safe_exit、停止词与事后照顾状态
+${adultHudLine}
 
 💡 **下一步行动建议（用户可输入序号或自由回复）**：
 1. [积极互动且符合当前关系边界]
